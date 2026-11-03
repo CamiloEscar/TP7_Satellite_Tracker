@@ -16,12 +16,12 @@ Forma de trabajo (heredada del TP6): un hito por sesión; este archivo es el ún
 | RF-06 | Notificación N minutos antes del pase                      | 8    | Pendiente    |                                                                                                    |
 | RF-07 | Modo brújula (overlay de orientación)                      | 7    | Pendiente    |                                                                                                    |
 | RF-08 | Filtrar catálogo por constelación                          | 4    | Pendiente    |                                                                                                    |
-| RF-09 | Auto-refresh de datos orbitales por TTL (12-24 h)          | 3, 8 | Pendiente    |                                                                                                    |
+| RF-09 | Auto-refresh de datos orbitales por TTL (12-24 h)          | 3, 8 | Implementado | Hito 3: caché TTL 12-24 h + fallback stale (lógica). Falta auto-refresh background (Hito 8).       |
 | RF-10 | Mapa con posición en tiempo real (refresco 1-5 s local)    | 5    | Pendiente    |                                                                                                    |
 | RF-11 | Ground track ±1 órbita con corte de antimeridiano          | 5    | Pendiente    |                                                                                                    |
 | RF-12 | Footprint según altitud y elevación mínima configurable    | 5    | Pendiente    |                                                                                                    |
 | RF-13 | Capa de constelación (subconjunto Starlink)                | 9    | Pendiente    |                                                                                                    |
-| RF-14 | Abstracción de proveedores + caché + fallback              | 3    | Pendiente    |                                                                                                    |
+| RF-14 | Abstracción de proveedores + caché + fallback              | 3    | Implementado | Hito 3: `DataProvider` + 4 proveedores + orquestador con fallback; 44 tests offline.               |
 | RF-15 | Modo validación vs N2YO / Where the ISS at? (error km)     | 10   | Pendiente    |                                                                                                    |
 | RF-16 | Antigüedad de datos orbitales + alerta de desactualización | 4    | Pendiente    |                                                                                                    |
 
@@ -62,17 +62,18 @@ Forma de trabajo (heredada del TP6): un hito por sesión; este archivo es el ún
 
 ## Hito 3 — Capa de datos (proveedores, caché, fallback)
 
-- [ ] Interfaz `DataProvider`: `getCatalog`, `getOrbitalData`, `getValidationPosition`
-- [ ] `CelesTrakProvider`: catálogo GP en JSON/OMM + SupGP Starlink (`sup-gp.php?FILE=starlink&FORMAT=json`)
-- [ ] Caché local con TTL 12-24 h + marca de antigüedad; operar sin conectividad
-- [ ] Rate limiter por proveedor (límites verificados: N2YO 1000/h tle+positions y 100/h passes+above; WTIA ~1 req/s; Space-Track a confirmar **(humano)** con cuenta) + reintentos con backoff exponencial
-- [ ] `WhereTheIssProvider`: `/tles` y `/positions?timestamps=` (validación por timestamp exacto)
-- [ ] `N2yoProvider`: apiKey fuera del bundle — **(humano)** genera la key gratuita
-- [ ] `SpaceTrackProvider` (fallback): identidad/contraseña — **(humano)**; sesión cookie; credenciales jamás en código ni logs
-- [ ] Orquestador con fallback automático CelesTrak → Space-Track
-- [ ] Tests offline con fixtures: parse OMM/SupGP, TTL vencido, rate limit, fallback entre proveedores
+- [x] Interfaz `DataProvider`: `getCatalog`, `getOrbitalData`, `getValidationPosition`
+- [x] `CelesTrakProvider`: catálogo GP en JSON/OMM + SupGP Starlink (`sup-gp.php?FILE=starlink&FORMAT=json`)
+- [x] Caché local con TTL 12-24 h + marca de antigüedad; operar sin conectividad
+- [x] Rate limiter por proveedor (límites verificados: N2YO 1000/h tle+positions y 100/h passes+above; WTIA ~1 req/s; Space-Track a confirmar **(humano)** con cuenta) + reintentos con backoff exponencial
+- [x] `WhereTheIssProvider`: `/tles` y `/positions?timestamps=` (validación por timestamp exacto)
+- [x] `N2yoProvider`: apiKey fuera del bundle — **(humano)** genera la key gratuita
+- [x] `SpaceTrackProvider` (fallback): identidad/contraseña — **(humano)**; sesión cookie; credenciales jamás en código ni logs
+- [x] Orquestador con fallback automático CelesTrak → Space-Track
+- [x] Tests offline con fixtures: parse OMM/SupGP, TTL vencido, rate limit, fallback entre proveedores
 
 **Aceptación:** RF-14 Implementado; RF-09 (lógica TTL) Implementado; catálogo consultable offline desde caché.
+**Estado:** **Verificado (tests)** (2026-11-03): jest 69/69 offline (44 nuevos de `data`), `eslint` + `tsc --noEmit` OK, assess riesgo **medium**. Pendiente empírico: build de op-sqlite y accesos vivos a APIs **(humano)** (ver registro).
 
 ## Hito 4 — Catálogo y búsqueda
 
@@ -184,6 +185,19 @@ _(el agente agrega aquí: fecha, resumen, archivos, dependencias nuevas, comando
 - Nota de diseño para Hito 5/6: `subpointAt` y `lookAnglesAt` propagan cada uno por su cuenta — quien necesite ambos por muestra debería usar `propagateEci` una vez y derivar. Revisar al medir rendimiento.
 - Verificación delegada: assess medium + spot check propio (tsc 0, jest 25/25) + lectura de dominio del engine (rad/deg, UTC, normalización (-180,180], mapeo de errores) sin hallazgos.
 - Próximo: Hito 3 (capa de datos).
+
+### 2026-11-03 — Hito 3 (agente)
+
+**Hito 3 — Implementado y Verificado (tests).** RF-14 Implementado; RF-09 (lógica TTL) Implementado.
+
+- Dependencia: `@op-engineering/op-sqlite@19.0.3`. Archivos: `src/data/{types,memoryStore,cache,rateLimiter,orchestrator,index}.ts`, `src/data/providers/{shared,celestrak,wheretheiss,n2yo,spacetrack}.ts`, `src/db/{schema,opSqliteStore,index}.ts`; 5 suites nuevas en `src/data/__tests__/` + 6 fixtures JSON offline. 44 tests nuevos (69/69 total).
+- API: `DataProvider` (`getCatalog`/`getOrbitalData`/`getValidationPosition`), `DataError` con códigos `DATA_*` (mismo patrón que `ORBIT_*`), puertos `CacheStore`/`SecretStore`/`HttpClient`/`Clock`. Caché TTL 12-24 h (default 24) con hit fresco sin red, refresco al vencer y servicio de datos vencidos (stale) cuando no hay conectividad; expone `fetchedAt`/`epoch`/`ageMs` (base de RF-16). Rate limiter sliding-window con los límites verificados del plan + `withRetry` (3 intentos, backoff exponencial, respeta `Retry-After`). Orquestador: CelesTrak → Space-Track (catálogo/órbita) y WTIA → N2YO (posición de validación); todos fallidos con caché vencida → la sirve marcada; sin caché → `DATA_ALL_PROVIDERS_FAILED`.
+- Comandos: `npx eslint .` OK; `npx tsc --noEmit` OK (strict); `npx jest` **69/69** (7 suites: 25 baseline + 44 nuevas); `gentle-ai review assess` riesgo **medium** (único motivo: `configuration_change` por package-lock); spot check propio: jest re-ejecutado 69/69.
+- Real vs simulado: código y tests reales; fixtures offline con formas reales de las APIs (OMM GP/SupGP de CelesTrak, WTIA `/tles` + `/positions` con valores en vivo, ejemplo oficial de N2YO, GP de Space-Track). Accesos vivos a APIs pendientes de API key N2YO y cuenta Space-Track **(humano)**: el plumbing está probado; la validación real es Hito 10.
+- Diseño: inversión de dependencias — `data` define `CacheStore` y no importa `db`; el adaptador op-sqlite (fino: SQL + mapeo) se inyecta en el bootstrap de la app (próximos hitos); la lógica TTL/cache es 100% testeable con `memoryStore`.
+- Gotchas: (1) fixtures `.json` y no `.ts` (jest trata todo `.ts` bajo `__tests__/` como suite); (2) URL de N2YO según docs oficiales (barra final antes de `&apiKey=`); (3) N2YO devuelve muestras now-forward → matching a 1 s con tolerancia ±1 s, mientras WTIA mantiene timestamp exacto; (4) Space-Track no tiene equivalente a `GROUP` de CelesTrak → el fallback de catálogo consulta payloads en órbita; (5) cookie de sesión de Space-Track delegada al cookie jar de la plataforma (upgrade path anotado con `ponytail:`).
+- Pendiente empírico: compilación/autolink de op-sqlite (regla del proyecto: no compilar tras cambios) — validar en el próximo build (Hito 4+); adapter Keychain para `SecretStore` cuando una pantalla lo necesite (Hito 10).
+- Próximo: Hito 4 (catálogo y búsqueda).
 
 ## Decisiones y estado (2026-11-02)
 

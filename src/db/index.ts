@@ -1,0 +1,7 @@
+export { DEFAULT_DB_NAME, OpSqliteStore } from './opSqliteStore';
+export {
+  CREATE_CATALOG_SNAPSHOT_NAME_INDEX,
+  CREATE_CATALOG_SNAPSHOT_TABLE,
+  CREATE_ORBITAL_DATA_TABLE,
+  SCHEMA_STATEMENTS,
+} from './schema';
