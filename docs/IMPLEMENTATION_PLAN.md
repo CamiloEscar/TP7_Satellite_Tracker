@@ -6,24 +6,24 @@ Forma de trabajo (heredada del TP6): un hito por sesión; este archivo es el ún
 
 ## Requisitos
 
-| ID    | Requisito                                                  | Hito | Estado    | Evidencia |
-| ----- | ---------------------------------------------------------- | ---- | --------- | --------- |
-| RF-01 | Buscar/seleccionar satélites por nombre o NORAD ID         | 4    | Pendiente |           |
-| RF-02 | Posición actual (lat/lon/alt) vía SGP4 local               | 2, 5 | Pendiente |           |
-| RF-03 | Azimut/elevación respecto del observador                   | 2, 7 | Pendiente |           |
-| RF-04 | Ventanas de visibilidad (AOS, máximo, LOS)                 | 6    | Pendiente |           |
-| RF-05 | Sky chart polar SVG                                        | 6    | Pendiente |           |
-| RF-06 | Notificación N minutos antes del pase                      | 8    | Pendiente |           |
-| RF-07 | Modo brújula (overlay de orientación)                      | 7    | Pendiente |           |
-| RF-08 | Filtrar catálogo por constelación                          | 4    | Pendiente |           |
-| RF-09 | Auto-refresh de datos orbitales por TTL (12-24 h)          | 3, 8 | Pendiente |           |
-| RF-10 | Mapa con posición en tiempo real (refresco 1-5 s local)    | 5    | Pendiente |           |
-| RF-11 | Ground track ±1 órbita con corte de antimeridiano          | 5    | Pendiente |           |
-| RF-12 | Footprint según altitud y elevación mínima configurable    | 5    | Pendiente |           |
-| RF-13 | Capa de constelación (subconjunto Starlink)                | 9    | Pendiente |           |
-| RF-14 | Abstracción de proveedores + caché + fallback              | 3    | Pendiente |           |
-| RF-15 | Modo validación vs N2YO / Where the ISS at? (error km)     | 10   | Pendiente |           |
-| RF-16 | Antigüedad de datos orbitales + alerta de desactualización | 4    | Pendiente |           |
+| ID    | Requisito                                                  | Hito | Estado       | Evidencia                                                                                          |
+| ----- | ---------------------------------------------------------- | ---- | ------------ | -------------------------------------------------------------------------------------------------- |
+| RF-01 | Buscar/seleccionar satélites por nombre o NORAD ID         | 4    | Pendiente    |                                                                                                    |
+| RF-02 | Posición actual (lat/lon/alt) vía SGP4 local               | 2, 5 | Implementado | Hito 2: `subpointAt`, 22 tests jest offline (TLE↔OMM <1 km, regression lock). Falta mapa (Hito 5). |
+| RF-03 | Azimut/elevación respecto del observador                   | 2, 7 | Implementado | Hito 2: `lookAnglesAt` (grados en frontera; el≈90°/range≈alt testeado). Falta UI viva (Hito 7).    |
+| RF-04 | Ventanas de visibilidad (AOS, máximo, LOS)                 | 6    | Pendiente    |                                                                                                    |
+| RF-05 | Sky chart polar SVG                                        | 6    | Pendiente    |                                                                                                    |
+| RF-06 | Notificación N minutos antes del pase                      | 8    | Pendiente    |                                                                                                    |
+| RF-07 | Modo brújula (overlay de orientación)                      | 7    | Pendiente    |                                                                                                    |
+| RF-08 | Filtrar catálogo por constelación                          | 4    | Pendiente    |                                                                                                    |
+| RF-09 | Auto-refresh de datos orbitales por TTL (12-24 h)          | 3, 8 | Pendiente    |                                                                                                    |
+| RF-10 | Mapa con posición en tiempo real (refresco 1-5 s local)    | 5    | Pendiente    |                                                                                                    |
+| RF-11 | Ground track ±1 órbita con corte de antimeridiano          | 5    | Pendiente    |                                                                                                    |
+| RF-12 | Footprint según altitud y elevación mínima configurable    | 5    | Pendiente    |                                                                                                    |
+| RF-13 | Capa de constelación (subconjunto Starlink)                | 9    | Pendiente    |                                                                                                    |
+| RF-14 | Abstracción de proveedores + caché + fallback              | 3    | Pendiente    |                                                                                                    |
+| RF-15 | Modo validación vs N2YO / Where the ISS at? (error km)     | 10   | Pendiente    |                                                                                                    |
+| RF-16 | Antigüedad de datos orbitales + alerta de desactualización | 4    | Pendiente    |                                                                                                    |
 
 ---
 
@@ -38,25 +38,27 @@ Forma de trabajo (heredada del TP6): un hito por sesión; este archivo es el ún
 
 ## Hito 1 — Base de la aplicación
 
-- [ ] Proyecto React Native CLI + TypeScript estricto, solo Android (patrón TP6)
-- [ ] Estructura de carpetas (`screens`, `components`, `domain`, `services`, `database`, `utils`, `types`)
-- [ ] React Navigation: Mapa, Catálogo, Pases, Validación, Configuración (estados vacíos)
-- [ ] Permisos en `AndroidManifest.xml`: INTERNET, ACCESS_FINE/COARSE_LOCATION, POST_NOTIFICATIONS (API 33+); runtime en contexto con cada feature
-- [ ] Lint + `tsc` + jest configurados
-- [ ] Generar APK debug (ruta corta del repo ya cumple; single-ABI si el build lo pide)
+- [x] Proyecto React Native CLI + TypeScript estricto, solo Android (patrón TP6)
+- [x] Estructura de carpetas — mínima: `screens`, `components`, `navigation`, `types` (sin dirs vacíos de capas futuras; se crean en su hito)
+- [x] React Navigation: Mapa, Catálogo, Pases, Validación, Configuración (estados vacíos) + Home como menú
+- [x] Permisos en `AndroidManifest.xml`: INTERNET, ACCESS_FINE/COARSE_LOCATION, POST_NOTIFICATIONS (API 33+); runtime en contexto con cada feature
+- [x] Lint + `tsc` + jest configurados
+- [x] Generar APK debug (ruta corta del repo ya cumple; single-ABI si el build lo pide)
 
 **Aceptación:** compila, genera APK y navega entre pantallas vacías en emulador.
+**Estado:** **Verificado** (2026-11-03): build exitoso, permisos verificados con `aapt` sobre el APK, navegación Home → Catálogo probada en emulador `Medium_Phone_API_36.1` con uiautomator.
 
 ## Hito 2 — Motor orbital (jest-first, sin dispositivo)
 
-- [ ] Wrapper TS sobre satellite.js: `json2satrec` (OMM/JSON, **formato principal**) y `twoline2satrec` (TLE, fallback legacy)
-- [ ] Propagación: ECI → ECF (`gstime`) → geodético lat/lon/alt (punto subsatelital)
-- [ ] Look angles topocéntricos: az/el/rango respecto del observador
-- [ ] **UTC end-to-end**: todo el dominio en UTC (epoch/Date), hora local solo en presentación
-- [ ] Manejo de errores de propagación: `satrec.error` (Decayed, etc.) → errores tipados `ORBIT_*`
-- [ ] Tests con fixtures offline (sin red): TLE/OMM de ISS de época fija vs valores de referencia; consistencia entre muestras consecutivas; satélite decaído
+- [x] Wrapper TS sobre satellite.js: `json2satrec` (OMM/JSON, **formato principal**) y `twoline2satrec` (TLE, fallback legacy)
+- [x] Propagación: ECI → ECF (`gstime`) → geodético lat/lon/alt (punto subsatelital)
+- [x] Look angles topocéntricos: az/el/rango respecto del observador
+- [x] **UTC end-to-end**: todo el dominio en UTC (epoch/Date), hora local solo en presentación
+- [x] Manejo de errores de propagación: `satrec.error` (Decayed, etc.) → errores tipados `ORBIT_*`
+- [x] Tests con fixtures offline (sin red): TLE/OMM de ISS de época fija vs valores de referencia; consistencia entre muestras consecutivas; satélite decaído
 
 **Aceptación:** motor puro con tests verdes sin red ni dispositivo. RF-02 y RF-03 (cálculo) Implementados.
+**Estado:** **Verificado (tests)** (2026-11-03): jest 25/25 offline (22 del motor + 3 de app), equivalencia TLE↔OMM <1 km, regression lock congelado. Riesgo Metro/ESM del Hito 0 **retirado con evidencia** (bundle 74.758 bytes; la falla real fue el WASM opcional, no el ESM — ver registro).
 
 ## Hito 3 — Capa de datos (proveedores, caché, fallback)
 
@@ -154,6 +156,34 @@ _(el agente agrega aquí: fecha, resumen, archivos, dependencias nuevas, comando
 - Compatibilidad real de las libs nativas con RN 0.88.1/New Arch **NO verificada hasta compilar en su hito** (lección TP6). satellite.js 7.1.0 es ESM con `exports`: verificar Metro en Hito 1.
 - Real vs simulado: solo diseño y datos de registry; nada compilado ni ejecutado todavía.
 - Próximo: Hito 1 (base de la app).
+
+### 2026-11-03 — Hito 1 (agente)
+
+**Hito 1 — Implementado y Verificado en emulador.**
+
+- Proyecto: `npx @react-native-community/cli@20.2.0 init SatelliteTracker --version 0.88.1 --package-name com.satellitetracker --skip-install` en temp, copiado a la raíz (sin `ios/` ni `Gemfile*`; `docs/` y enunciado intactos). react **19.3.0** (drift menor del template vs 19.3.1 de la matriz Hito 0 — sin impacto). Navigation: `@react-navigation/native` 7.5.1, `native-stack` 7.21.0, `react-native-screens` 4.30.1, `react-native-safe-area-context` 5.11.0.
+- Archivos: `App.tsx`, `src/navigation/AppNavigator.tsx`, `src/screens/` x6 (Home + 5), `src/components/EmptyState.tsx`, `src/types/index.ts`, `jest.config.js`, `__tests__/App.test.tsx` (3 tests), manifest +4 permisos, script `typecheck`. Sin placeholders de capas futuras.
+- Comandos y resultados: `npx eslint .` OK; `npx tsc --noEmit` OK (`"strict": true` confirmado); `npx jest` 3/3 pass; `.\gradlew.bat assembleDebug` BUILD SUCCESSFUL 4m07s (multi-ABI, APK 144,67 MB); rebuild `-PreactNativeArchitectures=x86_64` APK 46,42 MB (el multi-ABI no entraba en el emulador por espacio); `aapt dump permissions` → los 4 permisos presentes (+2 de debug RN, esperados).
+- Emulador `Medium_Phone_API_36.1`: APK x86_64 instalado; `am start` + uiautomator dump → Home lista las 5 pantallas; tap en "Catálogo" → header + empty state "Sin satélites cargados todavía." Metro + `adb reverse` requeridos en debug (esperado). Navegación al resto usa el mismo mecanismo del stack (verificado el patrón representativo).
+- Git: repo propio inicializado (`git init -b main`), 54 archivos staged, **0 commits** (humano decide).
+- Real vs simulado: todo real (build, aapt, instalación, navegación). Sin feature logic por diseño del hito.
+- Gotchas: (1) native-stack no monta children bajo react-test-renderer → el test de contenido renderiza `HomeScreen` con navigation falso; (2) `transformIgnorePatterns` debe EXTENDER el default del preset (pisarlo rompe el setup ESM de `@react-native/jest-preset`); (3) CLI no genera `android/local.properties` sin `ANDROID_HOME` → creado a mano (no versionado); (4) template genera dir cosmético `java/com/com.satellitetracker/` (segmento con punto; compila y corre, sin renombrar); (5) `am start` en vez de `monkey` para lanzar determinístico.
+- Próximo: Hito 2 (motor orbital, jest-first).
+
+### 2026-11-03 — Hito 2 (agente)
+
+**Hito 2 — Implementado y Verificado (tests).** RF-02 y RF-03 (cálculo) Implementados.
+
+- Dependencia: `satellite.js@7.1.0` exacta. Archivos: `src/orbital/{types.ts,engine.ts,index.ts}` + `src/orbital/__tests__/engine.test.ts` (22 tests); ajustes en `jest.config.js`, `babel.config.js`, `metro.config.js`.
+- API pública (grados en la frontera, radianes internos): `createSatrecFromOmm` (principal), `createSatrecFromTle` (legacy), `getEpoch` (UTC desde `jdsatepoch`), `subpointAt` (lat/lon normalizado a (-180,180], alt km), `lookAnglesAt` (az [0,360), el, range km), `propagateEci` (exportado para tests/Hito 5). Errores tipados `OrbitalError{code}`: `ORBIT_BAD_INPUT | ORBIT_DECAYED | ORBIT_PROPAGATION_FAILED`.
+- Comandos: `npm ls satellite.js` 7.1.0; `npx eslint .` OK; `npx tsc --noEmit` OK; `npx jest` **25/25** (2 suites); `npx react-native bundle --platform android --dev false` con entry descartable → **éxito, 74.758 bytes**, archivo temporario eliminado.
+- Tests clave: sanity ISS (|lat|≤52, 400-460 km); muestreo 60 s × 1 órbita con velocidad ECI 7,6-7,7 km/s; **equivalencia TLE↔OMM <1 km** (helper de conversión campo a campo); `getEpoch` ±1 s de 2019-06-05T12:12:57.999883Z; look angles con observador en el subpunto (el≈90°, range≈alt) y observador desplazado; errores (malformado→BAD_INPUT, fallo real de runtime forzando `satrec.no` negativo, null+Decayed→DECAYED); **regression lock congelado** (lat 10.085278, lon 143.659462, alt 418.144820 a epoch+42 min).
+- Real vs simulado: cómputo 100% real contra fixtures públicas embebidas (TLE ISS del README de satellite.js y ejemplo N2YO, OMM HELIOS 2A). Sin red. Correctitud numérica de SGP4 en sí = responsabilidad de la lib + validación del Hito 10.
+- **Riesgo Metro/ESM retirado, con giro**: Metro resolvió el `exports` map sin problemas; la falla fue el **WASM opcional** (`dist/index.js` re-exporta `./wasm/index.js` que importa dinámicamente `#wasm-single-thread` → Metro intenta resolver `node:module`). Fix pre-autorizado por ARCHITECTURE.md §6: `resolveRequest` devuelve `{type:'empty'}` para los dos specifiers `#wasm-*` en `metro.config.js` (el WASM es el techo del Hito 9, nunca se ejecuta en nuestro camino).
+- Gotchas jest+satellite.js: (1) el `exports` map **no tiene condición `require`/`default`** → jest no resuelve el bare specifier: `moduleNameMapper` → `dist/index.js`; (2) `dist/index.js` usa `export * as` que el preset de RN no transforma bajo jest → `@babel/plugin-transform-export-namespace-from` (ya venía como dependencia transitiva); (3) los exports ESM→CJS de babel no son configurables → `jest.spyOn` explota; usar `jest.mock` con factory + `requireActual`.
+- Nota de diseño para Hito 5/6: `subpointAt` y `lookAnglesAt` propagan cada uno por su cuenta — quien necesite ambos por muestra debería usar `propagateEci` una vez y derivar. Revisar al medir rendimiento.
+- Verificación delegada: assess medium + spot check propio (tsc 0, jest 25/25) + lectura de dominio del engine (rad/deg, UTC, normalización (-180,180], mapeo de errores) sin hallazgos.
+- Próximo: Hito 3 (capa de datos).
 
 ## Decisiones y estado (2026-11-02)
 
