@@ -44,7 +44,7 @@ const secrets: SecretStore = {
 const DEFAULT_OBSERVER: ObserverGeodetic = {
   latitudeDeg: -34.6037,
   longitudeDeg: -58.3816,
-  altitudeKm: 25,
+  altitudeKm: 0.025, // Buenos Aires is ~25 m above sea level (was a 25 km units slip)
 };
 
 /**

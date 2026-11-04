@@ -11,8 +11,8 @@ Forma de trabajo (heredada del TP6): un hito por sesión; este archivo es el ún
 | RF-01 | Buscar/seleccionar satélites por nombre o NORAD ID         | 4    | Verificado   | Hito 4: búsqueda nombre/NORAD + selección → detalle, verificado en emulador (92/92 jest).                                   |
 | RF-02 | Posición actual (lat/lon/alt) vía SGP4 local               | 2, 5 | Implementado | Hito 2: `subpointAt`, 22 tests jest offline (TLE↔OMM <1 km, regression lock). Falta mapa (Hito 5).                          |
 | RF-03 | Azimut/elevación respecto del observador                   | 2, 7 | Implementado | Hito 2: `lookAnglesAt` (grados en frontera; el≈90°/range≈alt testeado). Falta UI viva (Hito 7).                             |
-| RF-04 | Ventanas de visibilidad (AOS, máximo, LOS)                 | 6    | Pendiente    |                                                                                                                             |
-| RF-05 | Sky chart polar SVG                                        | 6    | Pendiente    |                                                                                                                             |
+| RF-04 | Ventanas de visibilidad (AOS, máximo, LOS)                 | 6    | Verificado   | Hito 6: AOS/LOS/máximo con bisección ~1 s; 4 escenarios del algoritmo regression-locked (135/135).                          |
+| RF-05 | Sky chart polar SVG                                        | 6    | Implementado | Hito 6: proyección polar testeada + Svg (anillos/trayectoria/posición); render visual en Hito 10.                           |
 | RF-06 | Notificación N minutos antes del pase                      | 8    | Pendiente    |                                                                                                                             |
 | RF-07 | Modo brújula (overlay de orientación)                      | 7    | Pendiente    |                                                                                                                             |
 | RF-08 | Filtrar catálogo por constelación                          | 4    | Verificado   | Hito 4: chips por grupo; ISS/GPS verificados en emulador; Starlink pendiente re-check (rate limit CelesTrak, ver registro). |
@@ -97,12 +97,13 @@ Forma de trabajo (heredada del TP6): un hito por sesión; este archivo es el ún
 
 ## Hito 6 — Predicción de pases y sky chart
 
-- [ ] Búsqueda AOS/LOS por refinamiento grueso → fino (paso grueso 30-60 s, refinado ~1 s), umbral de elevación mínima configurable
-- [ ] Lista de próximos pases: AOS (az), máximo (el), LOS (az), duración
-- [ ] Sky chart polar SVG (`react-native-svg`): círculos de elevación concéntricos, trayectoria del pase, posición actual
-- [ ] Tests del algoritmo: pase conocido de ISS (fixture con época fija), objeto GEO visto/no visto según latitud del observador, umbral 0° vs 10°, satélite que no sale
+- [x] Búsqueda AOS/LOS por refinamiento grueso → fino (paso grueso 30-60 s, refinado ~1 s), umbral de elevación mínima configurable
+- [x] Lista de próximos pases: AOS (az), máximo (el), LOS (az), duración
+- [x] Sky chart polar SVG (`react-native-svg`): círculos de elevación concéntricos, trayectoria del pase, posición actual
+- [x] Tests del algoritmo: pase conocido de ISS (fixture con época fija), objeto GEO visto/no visto según latitud del observador, umbral 0° vs 10°, satélite que no sale
 
 **Aceptación:** RF-04, RF-05 Implementados; algoritmo con tests automatizados.
+**Estado:** **Verificado (tests)** (2026-11-03): jest 135/135 con los 4 escenarios del algoritmo regression-locked, `eslint` + `tsc --noEmit` OK, assess riesgo **medium**. Render visual del sky chart pendiente de la validación en emulador del Hito 10.
 
 ## Hito 7 — Observador (GPS) y modo brújula
 
@@ -228,6 +229,18 @@ _(el agente agrega aquí: fecha, resumen, archivos, dependencias nuevas, comando
 - Gotchas: (1) el mock manual `__mocks__/react-native-maps.ts` es load-bearing — el paquete publica TS/ESM sin transpilar y jest no lo digiere; (2) gradle puede no regenerar el JS bundle pese a cambios de fuente: borrar `android/app/build/generated/assets/react/release/index.android.bundle` + cache de Metro antes del build; (3) el emulador se quedó sin espacio en `/data` (`INSTALL_FAILED_INSUFFICIENT_STORAGE`): `pm trim-caches` + `pm uninstall --user 0 com.google.android.webview` liberó ~260 MB.
 - **Migración del proveedor de mapa (decisión del humano, 2026-11-03)**: ante la API key de Google Maps como pendiente, el humano eligió evaluar la alternativa sin key. Resultado: `@maplibre/maplibre-react-native@11.5.1` es **viable en bare RN** — npm NO arrastra el peer `expo` (16 paquetes, `npm ls expo` vacío: el peer es opcional), la guía oficial "React Native" es instalar + rebuild, y v11 es solo New Architecture (compatible con RN 0.88). Migración aplicada: `Map`/`Camera`/`GeoJSONSource`/`Layer` (unificado `type="line"|"fill"`) + `Marker`; ground track como `MultiLineString` desde los segmentos de `splitAtAntimeridian`; footprint como polígono geodésico nuevo `footprintPolygonKm` (destination-point, 64 vértices + cierre exacto) con `Layer type="fill"`; tiles OSM raster inline (política de uso de OSM anotada: suficiente para TP/demo). Se elimina react-native-maps y todo el plumbing de la key de Google (manifest + gradle). Comandos: `eslint` OK, `tsc --noEmit` OK, `npx jest` **111/111** (106 + 5 de `footprintPolygonKm`); build `assembleRelease` OK en 2m13s (MapLibre Native v13 compilado/autolinkeado sin trámites extra). **Verificación visual en emulador completa**: tiles reales (Nueva Zelanda visible), marcador rojo sobre la traza, ground track azul con corte del antimeridiano en los bordes, footprint translúcido centrado con elevación 10°, readout vivo y chips operativos. Limitación conocida: polígonos que cruzan el antimeridiano o el círculo polar pueden renderizar con borde recto en MapLibre GL (la geometría de `src/geo` está testeada por separado). Nota: `docs/ARCHITECTURE.md` actualizado en la misma pasada (la matriz quedaba desactualizada con react-native-maps).
 - Próximo: Hito 6 (predicción de pases y sky chart).
+
+### 2026-11-03 — Hito 6 (agente)
+
+**Hito 6 — Implementado y Verificado (tests).** RF-04 y RF-05 Implementados.
+
+- Dependencia: `react-native-svg@15.16.0` (matriz Hito 0; solo npm — compilación nativa pendiente del próximo build). Archivos: `src/passes/{passes,skyChart,index}.ts` (capa pura: `findUpcomingPasses` con escaneo grueso 30 s → detección de cruce del umbral de elevación → bisección ~1 s, argmax + refinamiento parabólico del máximo, `samplePassTrajectory`; proyección polar az/el → coordenadas del chart), `src/observer.ts` (store de observador, default Buenos Aires, seam para Hito 7), `src/screens/PassesScreen.tsx` (lista AOS/Máximo/LOS/Duración + chips de umbral 0/5/10/20° + sky chart SVG con anillos de elevación, trayectoria y posición actual), `__mocks__/react-native-svg.ts`, tests: `src/passes/__tests__/{passes,skyChart}.test.ts` + `__tests__/PassesScreen.test.tsx`.
+- Comandos: `npx eslint .` OK; `npx tsc --noEmit` OK; `npx jest` **135/135** (14 suites: 111 baseline + 24 nuevos); `gentle-ai review assess` riesgo **medium**; spot check propio: jest re-ejecutado 135/135.
+- Tests del algoritmo (aceptación del hito — los 4 escenarios pedidos): (1) pase de ISS con época fija regression-locked (AOS/LOS/máximo, tolerancias ~1 s / ~0.1°); (2) objeto GEO visto/no visto según latitud del observador (lat −35 con el≈49° visible vs lat +70 con el≈11.5° bajo umbral 20°, misma longitud); (3) umbral 0° vs 10° (la ventana de 0° contiene estrictamente la de 10°: AOS más temprano, LOS más tarde); (4) satélite que nunca supera el umbral → resultado vacío. Más: consistencia duración/azimuth y proyección del sky chart (cenit→centro, horizonte→anillo borde, rotación N-arriba/E-derecha).
+- Decisiones: (1) semántica de borde de ventana: un pase en curso al inicio/fin del intervalo se reporta recortado al borde, no se descarta — sin esto un GEO siempre visible no tiene cruces de umbral y el escenario "GEO visto" sería inobservable (locked por el test); (2) el test GEO por latitud usa umbral 20° porque la elevación de un GEO es idéntica a ±lat: la única dicotomía real por latitud es lat media vs lat alta a igual longitud; (3) máximo = argmax de muestras de 5 s + vértice parabólico (determinista, sin golden-section); (4) `src/observer.ts` como seam mínimo con el patrón de `selection.ts` — Hito 7 lo alimenta con GPS/ubicación manual.
+- Gotchas: el placeholder `DEFAULT_OBSERVER` de `bootstrap.ts` traía `altitudeKm: 25` (slip de unidades: 25 km; Buenos Aires son ~25 m) — corregido a `0.025` en esta misma pasada; objetos siempre visibles escanean la ventana completa (~5760 propagaciones, ~140 ms medidos) y la trayectoria del chart está acotada a 256 muestras (`ponytail:`).
+- Real vs simulado: algoritmo y proyección 100% reales y testeados offline sobre el motor con fixtures de época fija; el render visual del sky chart queda para la validación en emulador del Hito 10 (el componente Svg está cubierto por mock y su geometría por tests).
+- Próximo: Hito 7 (observador GPS y modo brújula).
 
 ## Decisiones y estado (2026-11-02)
 
