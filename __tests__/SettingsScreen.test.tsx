@@ -17,6 +17,14 @@ jest.mock('@notifee/react-native');
 import { AuthorizationStatus } from '@notifee/react-native';
 import SettingsScreen from '../src/screens/SettingsScreen';
 import {
+  DEFAULT_CONSTELLATION_GROUP,
+  DEFAULT_CONSTELLATION_LIMIT,
+  getConstellationGroup,
+  getConstellationLimit,
+  setConstellationGroup,
+  setConstellationLimit,
+} from '../src/constellation';
+import {
   DEFAULT_DECLINATION_DEG,
   DEFAULT_OBSERVER,
   getDeclinationDeg,
@@ -58,6 +66,8 @@ beforeEach(() => {
   setObserver(DEFAULT_OBSERVER);
   setDeclinationDeg(DEFAULT_DECLINATION_DEG);
   setLeadMinutes(DEFAULT_LEAD_MINUTES);
+  setConstellationLimit(DEFAULT_CONSTELLATION_LIMIT);
+  setConstellationGroup(DEFAULT_CONSTELLATION_GROUP);
   notifeeMock.__resetNotifee();
   jest.spyOn(PermissionsAndroid, 'requestMultiple').mockResolvedValue(GRANTED);
   jest.mocked(Geolocation.getCurrentPosition).mockReset();
@@ -285,5 +295,47 @@ describe('SettingsScreen', () => {
     const renderer = await renderSettings();
 
     expect(visibleText(renderer)).not.toContain(PERMISSION_DENIED_MESSAGE);
+  });
+});
+
+describe('SettingsScreen - constellation settings', () => {
+  it('renders the constellation section with group chips and the limit input', async () => {
+    const renderer = await renderSettings();
+    const text = visibleText(renderer);
+    expect(text).toContain('Capa de constelación');
+    expect(text).toContain('Grupo');
+    expect(text).toContain('Starlink');
+    expect(text).toContain('Límite de objetos');
+    expect(text).toContain('Guardar límite');
+  });
+
+  it('saves a valid object limit into the config store', async () => {
+    const renderer = await renderSettings();
+    setText(renderer, 'constellation-limit-input', '75');
+    await press(renderer, 'constellation-limit-save');
+
+    expect(getConstellationLimit()).toBe(75);
+    expect(visibleText(renderer)).toContain('Límite guardado: 75 objetos.');
+  });
+
+  it('rejects an invalid object limit without touching the store', async () => {
+    const renderer = await renderSettings();
+    for (const bad of ['0', '101', '7.5', 'abc', '']) {
+      setText(renderer, 'constellation-limit-input', bad);
+      await press(renderer, 'constellation-limit-save');
+      expect(getConstellationLimit()).toBe(DEFAULT_CONSTELLATION_LIMIT);
+      expect(visibleText(renderer)).toContain(
+        'Límite fuera de rango (1 a 100).',
+      );
+    }
+  });
+
+  it('saves the selected constellation group chip into the config store', async () => {
+    const renderer = await renderSettings();
+    await press(renderer, 'constellation-group-iss');
+
+    expect(getConstellationGroup()).toBe('iss');
+    await press(renderer, 'constellation-group-all');
+    expect(getConstellationGroup()).toBe('all');
   });
 });

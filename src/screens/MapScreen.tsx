@@ -11,6 +11,16 @@ import {
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import CompassOverlay from '../components/CompassOverlay';
 import EmptyState from '../components/EmptyState';
+import {
+  createThrottle,
+  getConstellationGroup,
+  getConstellationLimit,
+  loadConstellation,
+  propagateConstellation,
+  subscribeConstellationGroup,
+  subscribeConstellationLimit,
+} from '../constellation';
+import type { ConstellationDot, ConstellationObject } from '../constellation';
 import { useDataProvider } from '../dataProviderContext';
 import type { OrbitalRecord } from '../data';
 import {
@@ -33,7 +43,11 @@ import {
   subpointAt,
 } from '../orbital';
 import type { LookAnglesResult, Satrec, SubpointResult } from '../orbital';
-import { getSelectedNoradId, subscribeSelectedNoradId } from '../selection';
+import {
+  getSelectedNoradId,
+  setSelectedNoradId,
+  subscribeSelectedNoradId,
+} from '../selection';
 import type { RootStackParamList } from '../types';
 
 export type MapScreenProps = NativeStackScreenProps<RootStackParamList, 'Mapa'>;
@@ -45,6 +59,11 @@ const DEFAULT_MIN_ELEVATION_DEG = 10;
 // ponytail: refresh hardcoded at 2.5 s (spec range 1-5 s); expose it in the
 // Hito 8 settings screen only if the user actually asks for it.
 const POSITION_REFRESH_MS = 2500;
+
+// Constellation layer (RF-13): the batch is recomputed on the same tick as
+// the marker but state is throttled to half that rate, so N dots never
+// publish faster than this (batch + throttle, no Workers in RN).
+const CONSTELLATION_REFRESH_MS = 5000;
 
 interface MarkerPosition extends SubpointResult {
   timeUTC: Date;
@@ -77,7 +96,15 @@ export default function MapScreen({ route }: MapScreenProps) {
     subscribeSelectedNoradId,
     getSelectedNoradId,
   );
-  const noradId = route.params?.noradId ?? selectedNoradId;
+  // A route param only seeds the selection store: the store stays the single
+  // source of truth so a constellation-dot tap can promote any object.
+  const routeNoradId = route.params?.noradId;
+  useEffect(() => {
+    if (routeNoradId !== undefined) {
+      setSelectedNoradId(routeNoradId);
+    }
+  }, [routeNoradId]);
+  const noradId = selectedNoradId;
   const [record, setRecord] = useState<OrbitalRecord | null>(null);
   const [satrec, setSatrec] = useState<Satrec | null>(null);
   const [failed, setFailed] = useState(false);
@@ -85,6 +112,18 @@ export default function MapScreen({ route }: MapScreenProps) {
   const [position, setPosition] = useState<MarkerPosition | null>(null);
   const [look, setLook] = useState<LookAnglesResult | null>(null);
   const [compassOpen, setCompassOpen] = useState(false);
+  const [constellation, setConstellation] = useState<
+    ConstellationObject[] | null
+  >(null);
+  const [dots, setDots] = useState<ConstellationDot[]>([]);
+  const constellationLimit = useSyncExternalStore(
+    subscribeConstellationLimit,
+    getConstellationLimit,
+  );
+  const constellationGroup = useSyncExternalStore(
+    subscribeConstellationGroup,
+    getConstellationGroup,
+  );
   const declinationDeg = useSyncExternalStore(
     subscribeDeclinationDeg,
     getDeclinationDeg,
@@ -149,6 +188,47 @@ export default function MapScreen({ route }: MapScreenProps) {
     return () => clearInterval(refresh);
   }, [satrec]);
 
+  // Constellation subset (RF-13): loaded through the existing data layer
+  // (catalog + per-satellite element sets). A load failure is not fatal - the
+  // map keeps working with just the selected satellite.
+  useEffect(() => {
+    let cancelled = false;
+    setConstellation(null);
+    loadConstellation(provider, constellationLimit, constellationGroup)
+      .then(objects => {
+        if (!cancelled) {
+          setConstellation(objects);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setConstellation([]);
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [provider, constellationLimit, constellationGroup]);
+
+  useEffect(() => {
+    if (!constellation || constellation.length === 0) {
+      setDots([]);
+      return;
+    }
+    // Batch + throttle (ARCHITECTURE.md §4): the whole subset is propagated
+    // at one timestamp and state is published at most once per
+    // CONSTELLATION_REFRESH_MS (no Web Workers in RN).
+    const update = createThrottle(() => {
+      setDots(propagateConstellation(constellation, new Date()));
+    }, CONSTELLATION_REFRESH_MS);
+    update();
+    const refresh = setInterval(update, POSITION_REFRESH_MS);
+    return () => {
+      clearInterval(refresh);
+      update.cancel();
+    };
+  }, [constellation]);
+
   const segments = useMemo(() => splitAtAntimeridian(track), [track]);
   const trackGeoJson = useMemo<GeoJSON.MultiLineString>(
     () => ({
@@ -158,6 +238,35 @@ export default function MapScreen({ route }: MapScreenProps) {
     }),
     [segments],
   );
+
+  // The selected satellite keeps its own marker and detail; the dots are the
+  // rest of the subset (LIMITED INTERACTION - tapping only promotes).
+  const dotsGeoJson = useMemo<GeoJSON.FeatureCollection>(
+    () => ({
+      type: 'FeatureCollection',
+      features: dots
+        .filter(dot => dot.noradId !== noradId)
+        .map(dot => ({
+          type: 'Feature',
+          geometry: {
+            type: 'Point',
+            coordinates: [dot.longitudeDeg, dot.latitudeDeg],
+          },
+          properties: { noradId: dot.noradId },
+        })),
+    }),
+    [dots, noradId],
+  );
+
+  const promoteConstellationDot = (event: {
+    nativeEvent: { features: GeoJSON.Feature[] };
+  }): void => {
+    const promoted: unknown =
+      event.nativeEvent.features[0]?.properties?.noradId;
+    if (typeof promoted === 'number') {
+      setSelectedNoradId(promoted);
+    }
+  };
 
   if (failed) {
     return <EmptyState message="No se pudieron cargar los datos orbitales." />;
@@ -199,6 +308,22 @@ export default function MapScreen({ route }: MapScreenProps) {
           <Layer
             type="fill"
             paint={{ 'fill-color': '#1E88E5', 'fill-opacity': 0.15 }}
+          />
+        </GeoJSONSource>
+        {/* Constellation dots (RF-13): native circle layer, tap promotes the
+            object to the current selection (full detail follows). */}
+        <GeoJSONSource
+          id="constellation-dots"
+          data={dotsGeoJson}
+          onPress={promoteConstellationDot}
+        >
+          <Layer
+            type="circle"
+            paint={{
+              'circle-radius': 3,
+              'circle-color': '#1E88E5',
+              'circle-opacity': 0.8,
+            }}
           />
         </GeoJSONSource>
       </Map>

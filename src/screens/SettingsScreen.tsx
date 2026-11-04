@@ -10,6 +10,17 @@ import {
 } from 'react-native';
 import Geolocation from 'react-native-geolocation-service';
 import {
+  CONSTELLATION_GROUP_CHIPS,
+  MAX_CONSTELLATION_LIMIT,
+  MIN_CONSTELLATION_LIMIT,
+  getConstellationGroup,
+  getConstellationLimit,
+  parseConstellationLimit,
+  setConstellationGroup,
+  setConstellationLimit,
+  subscribeConstellationGroup,
+} from '../constellation';
+import {
   MAX_LEAD_MINUTES,
   MIN_LEAD_MINUTES,
   createNotificationService,
@@ -94,6 +105,12 @@ export default function SettingsScreen() {
   const [leadStatus, setLeadStatus] = useState<string | null>(null);
   const [notificationPermission, setNotificationPermission] =
     useState<NotificationPermissionState | null>(null);
+  const constellationGroup = useSyncExternalStore(
+    subscribeConstellationGroup,
+    getConstellationGroup,
+  );
+  const [limitText, setLimitText] = useState(String(getConstellationLimit()));
+  const [limitStatus, setLimitStatus] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -180,6 +197,18 @@ export default function SettingsScreen() {
     }
     setLeadMinutes(value);
     setLeadStatus(`Aviso guardado: ${value} min`);
+  };
+
+  const saveLimit = () => {
+    const value = parseConstellationLimit(limitText);
+    if (value === null) {
+      setLimitStatus(
+        `Límite fuera de rango (${MIN_CONSTELLATION_LIMIT} a ${MAX_CONSTELLATION_LIMIT}).`,
+      );
+      return;
+    }
+    setConstellationLimit(value);
+    setLimitStatus(`Límite guardado: ${value} objetos.`);
   };
 
   return (
@@ -296,6 +325,55 @@ export default function SettingsScreen() {
           {notificationPermission.message}
         </Text>
       )}
+
+      <Text style={styles.sectionTitle}>Capa de constelación</Text>
+      <Text style={styles.note}>
+        Subconjunto de satélites mostrado en el mapa. Solo el satélite
+        seleccionado tiene detalle completo.
+      </Text>
+      <Text style={styles.fieldLabel}>Grupo</Text>
+      <View style={styles.chips}>
+        {CONSTELLATION_GROUP_CHIPS.map(chip => (
+          <Pressable
+            key={chip.key}
+            testID={`constellation-group-${chip.key}`}
+            onPress={() => setConstellationGroup(chip.key)}
+            style={[
+              styles.chip,
+              constellationGroup === chip.key && styles.chipActive,
+            ]}
+          >
+            <Text
+              style={[
+                styles.chipLabel,
+                constellationGroup === chip.key && styles.chipLabelActive,
+              ]}
+            >
+              {chip.label}
+            </Text>
+          </Pressable>
+        ))}
+      </View>
+      <Text style={styles.fieldLabel}>Límite de objetos</Text>
+      <TextInput
+        style={styles.input}
+        testID="constellation-limit-input"
+        value={limitText}
+        onChangeText={setLimitText}
+        keyboardType="numbers-and-punctuation"
+      />
+      <Pressable
+        style={styles.button}
+        testID="constellation-limit-save"
+        onPress={saveLimit}
+      >
+        <Text style={styles.buttonLabel}>Guardar límite</Text>
+      </Pressable>
+      {limitStatus && (
+        <Text style={styles.status} testID="constellation-limit-status">
+          {limitStatus}
+        </Text>
+      )}
       <View style={styles.footer} />
     </ScrollView>
   );
@@ -355,6 +433,31 @@ const styles = StyleSheet.create({
   note: {
     fontSize: 12,
     color: '#666666',
+  },
+  chips: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginTop: 4,
+  },
+  chip: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 14,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: '#CCCCCC',
+  },
+  chipActive: {
+    backgroundColor: '#000000',
+    borderColor: '#000000',
+  },
+  chipLabel: {
+    fontSize: 13,
+    color: '#000000',
+  },
+  chipLabelActive: {
+    color: '#FFFFFF',
   },
   footer: {
     height: 24,

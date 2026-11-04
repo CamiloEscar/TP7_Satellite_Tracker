@@ -41,6 +41,7 @@ src/
 ├── data/           # Data Provider Layer: DataProvider, CelesTrak/SpaceTrack/N2YO/WTIA, caché+TTL, rate limiter, fallback
 ├── db/             # op-sqlite: esquema, migraciones, repositories
 ├── observer/       # Observer Layer: GPS, ubicación manual, magnetómetro + declinación
+├── constellation/  # Constellation Layer (RF-13): subconjunto determinístico, propagación en lote + throttle, dots del mapa
 ├── notifications/  # Notification Layer: scheduling con notifee, background refresh
 ├── validation/     # Validation Layer: comparación vs N2YO/WTIA, error en km
 ├── screens/        # Mapa, Catálogo, Pases (sky chart), Validación, Configuración
@@ -48,7 +49,7 @@ src/
 └── types/
 ```
 
-Regla de dependencia: `orbital`, `passes`, `geo` no importan nada de React Native (testables con jest puro). `data` depende de `db`. Las capas de UI orquestan.
+Regla de dependencia: `orbital`, `passes`, `geo`, `constellation` no importan nada de React Native (testables con jest puro). `data` depende de `db`. Las capas de UI orquestan.
 
 ## 3. Modelo de datos (op-sqlite)
 

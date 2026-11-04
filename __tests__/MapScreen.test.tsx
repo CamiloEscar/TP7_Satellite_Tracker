@@ -16,9 +16,15 @@ jest.mock('react-native-svg');
 jest.mock('react-native-sensors');
 
 import MapScreen, { type MapScreenProps } from '../src/screens/MapScreen';
+import {
+  DEFAULT_CONSTELLATION_GROUP,
+  DEFAULT_CONSTELLATION_LIMIT,
+  setConstellationGroup,
+  setConstellationLimit,
+} from '../src/constellation';
 import { DataProviderContext } from '../src/dataProviderContext';
 import type { AppDataProvider } from '../src/dataProviderContext';
-import type { OrbitalRecord } from '../src/data';
+import type { CatalogEntry, OrbitalRecord } from '../src/data';
 import {
   DEFAULT_SATELLITE_NORAD_ID,
   setSelectedNoradId,
@@ -85,6 +91,62 @@ function fakeProvider(
   };
 }
 
+function makeTleRecord(noradId: number, name: string): OrbitalRecord {
+  return {
+    format: 'tle',
+    noradId,
+    name,
+    source: 'celestrak-gp',
+    epoch: new Date('2019-06-05T12:12:58.000Z'),
+    fetchedAt: new Date('2019-06-05T13:00:00.000Z'),
+    payload: ISS_TLE_A,
+  };
+}
+
+/** Mixed catalog: 3 Starlink + 1 weather, deliberately out of NORAD order. */
+function constellationProvider(): AppDataProvider {
+  return fakeProvider({
+    getCatalog: async (): Promise<CatalogEntry[]> => [
+      { noradId: 48276, name: 'STARLINK-30002', group: 'starlink' },
+      { noradId: 48274, name: 'STARLINK-30000', group: 'starlink' },
+      { noradId: 33591, name: 'NOAA 19', group: 'weather' },
+      { noradId: 48275, name: 'STARLINK-30001', group: 'starlink' },
+    ],
+    getOrbitalData: async (noradId: number) =>
+      noradId === DEFAULT_SATELLITE_NORAD_ID
+        ? ISS_RECORD
+        : makeTleRecord(noradId, `SAT-${noradId}`),
+  });
+}
+
+/** NORAD ids of the rendered constellation dots, in source order. */
+function dotsOf(renderer: ReactTestRenderer.ReactTestRenderer): number[] {
+  const source = renderer.root.findByProps({ id: 'constellation-dots' });
+  const data = source.props.data as GeoJSON.FeatureCollection;
+  return data.features.map(
+    feature => (feature.properties as { noradId: number }).noradId,
+  );
+}
+
+async function tapConstellationDot(
+  renderer: ReactTestRenderer.ReactTestRenderer,
+  noradId: number,
+) {
+  await ReactTestRenderer.act(async () => {
+    renderer.root.findByProps({ id: 'constellation-dots' }).props.onPress({
+      nativeEvent: {
+        features: [
+          {
+            type: 'Feature',
+            properties: { noradId },
+            geometry: { type: 'Point', coordinates: [0, 0] },
+          },
+        ],
+      },
+    });
+  });
+}
+
 const mountedRenderers: ReactTestRenderer.ReactTestRenderer[] = [];
 
 beforeEach(() => {
@@ -93,6 +155,8 @@ beforeEach(() => {
   jest.useFakeTimers();
   jest.setSystemTime(new Date('2019-06-05T12:13:00.000Z'));
   setSelectedNoradId(DEFAULT_SATELLITE_NORAD_ID);
+  setConstellationLimit(DEFAULT_CONSTELLATION_LIMIT);
+  setConstellationGroup(DEFAULT_CONSTELLATION_GROUP);
   sensorsMock.__resetMagnetometer();
 });
 
@@ -231,5 +295,39 @@ describe('MapScreen - az/el readout and compass overlay', () => {
     // Manual magnetic heading 90°; default -10° declination -> true 80°.
     expect(visibleText(renderer)).toContain('Rumbo verdadero: 80.0° (E)');
     expect(visibleText(renderer)).toContain('Ángulo al satélite:');
+  });
+});
+
+describe('MapScreen - constellation layer', () => {
+  it('renders the Starlink subset as dots ordered by NORAD ID', async () => {
+    const renderer = await renderMap(constellationProvider());
+    expect(dotsOf(renderer)).toEqual([48274, 48275, 48276]);
+  });
+
+  it('promotes a tapped constellation dot to the current selection', async () => {
+    const renderer = await renderMap(constellationProvider());
+    await tapConstellationDot(renderer, 48275);
+
+    const text = visibleText(renderer);
+    expect(text).toContain('SAT-48275');
+    expect(text).toContain('(NORAD 48275)');
+  });
+
+  it('respects the configured object limit', async () => {
+    setConstellationLimit(2);
+    const renderer = await renderMap(constellationProvider());
+    expect(dotsOf(renderer)).toEqual([48274, 48275]);
+  });
+
+  it('filters the dots by the configured group', async () => {
+    setConstellationGroup('weather');
+    const renderer = await renderMap(constellationProvider());
+    expect(dotsOf(renderer)).toEqual([33591]);
+  });
+
+  it('keeps the selected satellite out of the dots (it has its own marker)', async () => {
+    setSelectedNoradId(48274);
+    const renderer = await renderMap(constellationProvider());
+    expect(dotsOf(renderer)).toEqual([48275, 48276]);
   });
 });
