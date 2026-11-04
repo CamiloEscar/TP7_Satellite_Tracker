@@ -13,6 +13,12 @@ export interface LatLon {
   longitudeDeg: number;
 }
 
+/**
+ * GeoJSON position in degrees: `[longitude, latitude]` — GeoJSON axis order,
+ * the OPPOSITE of the named `LatLon` fields used elsewhere in this module.
+ */
+export type GeoJsonPosition = [longitudeDeg: number, latitudeDeg: number];
+
 /** One ground-track sample: sub-satellite point at a UTC instant. */
 export interface GroundTrackSample extends LatLon {
   timeUTC: Date;
@@ -94,4 +100,47 @@ export function footprintRadiusKm(
     (EARTH_RADIUS_KM / (EARTH_RADIUS_KM + altitudeKm)) * Math.cos(thetaRad);
   const gammaRad = Math.acos(Math.min(1, Math.max(-1, argument))) - thetaRad;
   return Math.max(0, EARTH_RADIUS_KM * gammaRad);
+}
+
+/**
+ * Geodesic footprint circle as a closed GeoJSON polygon ring on the sphere
+ * (destination-point formula: each vertex lies `radiusKm` from the center at
+ * successive bearings). Returns `segments + 1` positions — `segments` vertices
+ * plus an exact closing copy of the first one. Positions are in GeoJSON order
+ * (`GeoJsonPosition`), NOT the `LatLon` order used by the track functions.
+ * Longitudes wrap to [-180, 180] so the ring stays valid GeoJSON.
+ */
+export function footprintPolygonKm(
+  centerLatDeg: number,
+  centerLonDeg: number,
+  radiusKm: number,
+  segments = 64,
+): GeoJsonPosition[] {
+  if (!Number.isInteger(segments) || segments < 3) {
+    throw new OrbitalError(
+      'ORBIT_BAD_INPUT',
+      'segments must be an integer >= 3.',
+    );
+  }
+  const lat1 = (centerLatDeg * Math.PI) / 180;
+  const lon1 = (centerLonDeg * Math.PI) / 180;
+  const delta = radiusKm / EARTH_RADIUS_KM; // angular distance (rad)
+  const ring: GeoJsonPosition[] = [];
+  for (let i = 0; i < segments; i += 1) {
+    const theta = (2 * Math.PI * i) / segments; // bearing (rad)
+    const lat2 = Math.asin(
+      Math.sin(lat1) * Math.cos(delta) +
+        Math.cos(lat1) * Math.sin(delta) * Math.cos(theta),
+    );
+    const lon2 =
+      lon1 +
+      Math.atan2(
+        Math.sin(theta) * Math.sin(delta) * Math.cos(lat1),
+        Math.cos(delta) - Math.sin(lat1) * Math.sin(lat2),
+      );
+    const lonDeg = (((lon2 * 180) / Math.PI + 540) % 360) - 180;
+    ring.push([lonDeg, (lat2 * 180) / Math.PI]);
+  }
+  ring.push(ring[0]); // exact closing vertex
+  return ring;
 }

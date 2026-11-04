@@ -1,16 +1,24 @@
 import { useEffect, useMemo, useState, useSyncExternalStore } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
-import MapView, { Circle, Marker, Polyline } from 'react-native-maps';
+import {
+  Camera,
+  GeoJSONSource,
+  Layer,
+  Map,
+  Marker,
+  type StyleSpecification,
+} from '@maplibre/maplibre-react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import EmptyState from '../components/EmptyState';
 import { useDataProvider } from '../dataProviderContext';
 import type { OrbitalRecord } from '../data';
 import {
+  footprintPolygonKm,
   footprintRadiusKm,
   sampleGroundTrack,
   splitAtAntimeridian,
 } from '../geo';
-import type { GroundTrackSample, LatLon } from '../geo';
+import type { GeoJsonPosition, GroundTrackSample, LatLon } from '../geo';
 import {
   createSatrecFromOmm,
   createSatrecFromTle,
@@ -34,9 +42,26 @@ interface MarkerPosition extends SubpointResult {
   timeUTC: Date;
 }
 
-function toCoordinate(point: LatLon) {
-  return { latitude: point.latitudeDeg, longitude: point.longitudeDeg };
+/** GeoJSON order: [longitude, latitude] — the reverse of `LatLon` fields. */
+function toPosition(point: LatLon): GeoJsonPosition {
+  return [point.longitudeDeg, point.latitudeDeg];
 }
+
+// Keyless OSM raster tiles. Attribution is required by the OSM tile usage
+// policy (https://operations.osm.org/policies/tiles/); keep it attached to
+// the source so the map credits OpenStreetMap contributors.
+const OSM_STYLE: StyleSpecification = {
+  version: 8,
+  sources: {
+    osm: {
+      type: 'raster',
+      tiles: ['https://tile.openstreetmap.org/{z}/{x}/{y}.png'],
+      tileSize: 256,
+      attribution: '© OpenStreetMap contributors',
+    },
+  },
+  layers: [{ id: 'osm', type: 'raster', source: 'osm' }],
+};
 
 export default function MapScreen({ route }: MapScreenProps) {
   const provider = useDataProvider();
@@ -107,6 +132,14 @@ export default function MapScreen({ route }: MapScreenProps) {
   }, [satrec]);
 
   const segments = useMemo(() => splitAtAntimeridian(track), [track]);
+  const trackGeoJson = useMemo<GeoJSON.MultiLineString>(
+    () => ({
+      type: 'MultiLineString',
+      // GeoJSON positions are [longitude, latitude]; `toPosition` converts.
+      coordinates: segments.map(segment => segment.map(toPosition)),
+    }),
+    [segments],
+  );
 
   if (failed) {
     return <EmptyState message="No se pudieron cargar los datos orbitales." />;
@@ -115,29 +148,42 @@ export default function MapScreen({ route }: MapScreenProps) {
     return <EmptyState message="Cargando posición del satélite..." />;
   }
 
-  const coordinate = toCoordinate(position);
+  const positionLngLat = toPosition(position);
+  const footprintGeoJson: GeoJSON.Polygon = {
+    type: 'Polygon',
+    coordinates: [
+      footprintPolygonKm(
+        position.latitudeDeg,
+        position.longitudeDeg,
+        footprintRadiusKm(position.altitudeKm, minElevationDeg),
+      ),
+    ],
+  };
   return (
     <View style={styles.container}>
-      <MapView
-        key={noradId}
-        style={styles.map}
-        initialRegion={{
-          ...coordinate,
-          latitudeDelta: 60,
-          longitudeDelta: 60,
-        }}
-      >
-        <Marker coordinate={coordinate} title={record.name} />
-        {segments.map((segment, index) => (
-          <Polyline key={index} coordinates={segment.map(toCoordinate)} />
-        ))}
-        <Circle
-          center={coordinate}
-          radius={
-            footprintRadiusKm(position.altitudeKm, minElevationDeg) * 1000
-          }
+      <Map style={styles.map} mapStyle={OSM_STYLE}>
+        {/* Recenter only when the satellite changes (keyed like the old
+            initialRegion remount). Zoom 2.5 ≈ the old 60° latitudeDelta. */}
+        <Camera
+          key={noradId}
+          initialViewState={{ center: positionLngLat, zoom: 2.5 }}
         />
-      </MapView>
+        <Marker lngLat={positionLngLat}>
+          <View style={styles.markerDot} />
+        </Marker>
+        <GeoJSONSource data={trackGeoJson}>
+          <Layer
+            type="line"
+            paint={{ 'line-color': '#1E88E5', 'line-width': 2 }}
+          />
+        </GeoJSONSource>
+        <GeoJSONSource data={footprintGeoJson}>
+          <Layer
+            type="fill"
+            paint={{ 'fill-color': '#1E88E5', 'fill-opacity': 0.15 }}
+          />
+        </GeoJSONSource>
+      </Map>
       <View style={styles.readout}>
         <Text style={styles.satName}>
           {record.name} (NORAD {record.noradId})
@@ -183,6 +229,14 @@ const styles = StyleSheet.create({
   },
   map: {
     flex: 1,
+  },
+  markerDot: {
+    width: 14,
+    height: 14,
+    borderRadius: 7,
+    backgroundColor: '#D32F2F',
+    borderWidth: 2,
+    borderColor: '#FFFFFF',
   },
   readout: {
     padding: 16,

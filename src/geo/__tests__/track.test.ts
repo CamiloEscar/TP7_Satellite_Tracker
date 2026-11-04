@@ -1,11 +1,13 @@
 import { createSatrecFromTle } from '../../orbital';
 import type { Satrec } from '../../orbital';
 import {
+  EARTH_RADIUS_KM,
+  footprintPolygonKm,
   footprintRadiusKm,
   sampleGroundTrack,
   splitAtAntimeridian,
 } from '../index';
-import type { LatLon } from '../index';
+import type { GeoJsonPosition, LatLon } from '../index';
 
 // ISS TLE A - satellite.js README example, epoch 2019-06-05T12:12:57.999883Z.
 const ISS_TLE_A_LINE1 =
@@ -132,6 +134,62 @@ describe('footprintRadiusKm', () => {
   it('shrinks with a higher minimum elevation', () => {
     expect(footprintRadiusKm(420, 0)).toBeGreaterThan(
       footprintRadiusKm(420, 20),
+    );
+  });
+});
+
+/** Great-circle distance in km between two GeoJSON positions ([lon, lat]). */
+function haversineKm(a: GeoJsonPosition, b: GeoJsonPosition): number {
+  const toRad = (deg: number) => (deg * Math.PI) / 180;
+  const dLat = toRad(b[1] - a[1]);
+  const dLon = toRad(b[0] - a[0]);
+  const h =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos(toRad(a[1])) * Math.cos(toRad(b[1])) * Math.sin(dLon / 2) ** 2;
+  return 2 * EARTH_RADIUS_KM * Math.asin(Math.min(1, Math.sqrt(h)));
+}
+
+describe('footprintPolygonKm', () => {
+  // GeoJSON order: [lon, lat].
+  const CENTER: GeoJsonPosition = [30, -40];
+
+  it('returns a closed ring with segments + 1 positions', () => {
+    const ring = footprintPolygonKm(CENTER[1], CENTER[0], 1000, 16);
+    expect(ring).toHaveLength(17);
+    expect(ring[ring.length - 1]).toEqual(ring[0]);
+  });
+
+  it('places every vertex ≈ radiusKm from the center via haversine', () => {
+    const radiusKm = 2252.39;
+    const ring = footprintPolygonKm(CENTER[1], CENTER[0], radiusKm);
+    expect(ring).toHaveLength(65); // default 64 segments + closing vertex
+    for (const vertex of ring) {
+      expect(haversineKm(CENTER, vertex)).toBeCloseTo(radiusKm, 3);
+    }
+  });
+
+  it('grows monotonically with the radius', () => {
+    const small = footprintPolygonKm(CENTER[1], CENTER[0], 500, 16);
+    const large = footprintPolygonKm(CENTER[1], CENTER[0], 1500, 16);
+    for (let i = 0; i < small.length; i += 1) {
+      expect(haversineKm(CENTER, large[i])).toBeGreaterThan(
+        haversineKm(CENTER, small[i]),
+      );
+    }
+  });
+
+  it('wraps longitudes into valid geodetic ranges across the antimeridian', () => {
+    const ring = footprintPolygonKm(0, 179, 500, 16);
+    for (const [longitudeDeg, latitudeDeg] of ring) {
+      expect(longitudeDeg).toBeGreaterThanOrEqual(-180);
+      expect(longitudeDeg).toBeLessThanOrEqual(180);
+      expect(Math.abs(latitudeDeg)).toBeLessThanOrEqual(90);
+    }
+  });
+
+  it('rejects fewer than three segments', () => {
+    expect(() => footprintPolygonKm(CENTER[1], CENTER[0], 100, 2)).toThrow(
+      'segments must be an integer >= 3.',
     );
   });
 });

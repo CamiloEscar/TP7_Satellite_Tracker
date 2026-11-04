@@ -6,9 +6,10 @@ import React from 'react';
 import ReactTestRenderer from 'react-test-renderer';
 import { Text } from 'react-native';
 
-// The real module is native; the manual mock in __mocks__/react-native-maps
-// provides plain MapView/Marker/Polyline/Circle components.
-jest.mock('react-native-maps');
+// The real module is native (Fabric/TurboModules); the manual mock in
+// __mocks__/@maplibre/maplibre-react-native provides plain
+// Map/Camera/GeoJSONSource/Layer/Marker components.
+jest.mock('@maplibre/maplibre-react-native');
 
 import MapScreen, { type MapScreenProps } from '../src/screens/MapScreen';
 import { DataProviderContext } from '../src/dataProviderContext';
