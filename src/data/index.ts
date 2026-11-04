@@ -1,5 +1,12 @@
 export { CacheService, DEFAULT_TTL_HOURS } from './cache';
 export type { CacheHit, CacheServiceOptions } from './cache';
+export {
+  DATA_TTL_MS,
+  filterCatalog,
+  formatDataAge,
+  isDataOverTtl,
+} from './catalogQuery';
+export type { CatalogGroupFilter } from './catalogQuery';
 export { MemoryCacheStore } from './memoryStore';
 export { DataOrchestrator } from './orchestrator';
 export type { DataOrchestratorOptions } from './orchestrator';

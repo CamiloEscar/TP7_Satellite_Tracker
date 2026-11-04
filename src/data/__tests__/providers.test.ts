@@ -107,6 +107,7 @@ describe('CelesTrakProvider', () => {
     { match: 'GROUP=stations', body: [gpFixture[0]] },
     { match: 'GROUP=gps-ops', body: [gpFixture[1]] },
     { match: 'GROUP=weather', body: [gpFixture[2]] },
+    { match: 'GROUP=starlink', body: [] },
     { match: 'sup-gp.php', body: supgpFixture },
   ];
 
@@ -143,7 +144,7 @@ describe('CelesTrakProvider', () => {
     expect(record.epoch.getTime()).toBe(Date.UTC(2026, 9, 30, 12, 0, 0));
     expect(record.fetchedAt.getTime()).toBe(FETCHED_AT_MS);
     // One download feeds both the catalog and the per-satellite lookups.
-    expect(calls).toHaveLength(4);
+    expect(calls).toHaveLength(5);
   });
 
   it('maps SupGP Starlink rows with source celestrak-supgp', async () => {
@@ -153,7 +154,7 @@ describe('CelesTrakProvider', () => {
     expect(record.format).toBe('omm');
     expect(record.source).toBe('celestrak-supgp');
     expect(record.name).toBe('STARLINK-30000');
-    expect(calls).toHaveLength(4);
+    expect(calls).toHaveLength(5);
   });
 
   it('classifies by name and NORAD id when the query group is generic', async () => {
@@ -184,11 +185,63 @@ describe('CelesTrakProvider', () => {
     await expectDataError(provider.getOrbitalData(999999), 'DATA_NOT_FOUND');
   });
 
+  it('tolerates a failing source and serves the remaining catalog', async () => {
+    const { provider } = makeProvider([
+      { match: 'GROUP=stations', body: [gpFixture[0]] },
+      { match: 'GROUP=gps-ops', body: [gpFixture[1]] },
+      { match: 'GROUP=weather', body: [gpFixture[2]] },
+      { match: 'GROUP=starlink', body: [] },
+      { match: 'sup-gp.php', status: 404, body: [] },
+    ]);
+    const entries = await provider.getCatalog();
+    expect(entries.map(e => e.noradId)).toEqual([25544, 43873, 33591]);
+  });
+
+  it('serves Starlink from GP when SupGP refuses repeat downloads (403)', async () => {
+    // Real-world behavior (verified 2026-11-03): CelesTrak answers SupGP FILE
+    // repeats within 2 h with a 403 text notice instead of the JSON set.
+    const { provider } = makeProvider([
+      { match: 'GROUP=stations', body: [] },
+      { match: 'GROUP=gps-ops', body: [] },
+      { match: 'GROUP=weather', body: [] },
+      { match: 'GROUP=starlink', body: [supgpFixture[0]] },
+      { match: 'sup-gp.php', status: 403, body: [] },
+    ]);
+    const entries = await provider.getCatalog();
+    expect(entries).toEqual([
+      { noradId: 47964, name: 'STARLINK-30000', group: 'starlink' },
+    ]);
+  });
+
+  it('keeps the newest SupGP element when an object has several epochs', async () => {
+    const base = supgpFixture[0] as unknown as Record<string, unknown>;
+    const older = { ...base, EPOCH: '2026-10-29T12:00:00.000000' };
+    const newer = { ...base, EPOCH: '2026-10-30T12:00:00.000000' };
+    const { provider } = makeProvider([
+      { match: 'GROUP=stations', body: [] },
+      { match: 'GROUP=gps-ops', body: [] },
+      { match: 'GROUP=weather', body: [] },
+      { match: 'GROUP=starlink', body: [] },
+      { match: 'sup-gp.php', body: [older, newer] },
+    ]);
+    await provider.getCatalog();
+    const record = await provider.getOrbitalData(base.NORAD_CAT_ID as number);
+    expect(record.epoch.getTime()).toBe(Date.UTC(2026, 9, 30, 12, 0, 0));
+  });
+
+  it('throws when every CelesTrak source fails', async () => {
+    const { provider } = makeProvider([
+      { match: 'GROUP=', status: 404, body: [] },
+      { match: 'sup-gp.php', status: 404, body: [] },
+    ]);
+    await expectDataError(provider.getCatalog(), 'DATA_NOT_FOUND');
+  });
+
   it('throws DATA_PARSE on malformed OMM rows or non-JSON responses', async () => {
     const { provider: badRow } = makeProvider(
       [
         { match: 'GROUP=stations', body: [{ OBJECT_NAME: 'INCOMPLETE' }] },
-        { match: 'sup-gp.php', body: [] },
+        { match: 'sup-gp.php', jsonFails: true },
       ],
       ['stations'],
     );
@@ -197,7 +250,7 @@ describe('CelesTrakProvider', () => {
     const { provider: badJson } = makeProvider(
       [
         { match: 'GROUP=stations', jsonFails: true },
-        { match: 'sup-gp.php', body: [] },
+        { match: 'sup-gp.php', body: [{ OBJECT_NAME: 'INCOMPLETE' }] },
       ],
       ['stations'],
     );

@@ -8,6 +8,27 @@ import { Text } from 'react-native';
 import App from '../App';
 import HomeScreen, { type HomeScreenProps } from '../src/screens/HomeScreen';
 
+// The real bootstrap wires op-sqlite + network providers (native module);
+// tests must never load it. The factory keeps the real module unimported.
+jest.mock('../src/bootstrap', () => ({
+  createDataProvider: () => ({
+    getCatalog: async () => [],
+    getCatalogWithMeta: async () => ({
+      value: [],
+      fetchedAt: new Date(0),
+      epoch: null,
+      stale: false,
+      ageMs: 0,
+    }),
+    getOrbitalData: async () => {
+      throw new Error('not implemented');
+    },
+    getValidationPosition: async () => {
+      throw new Error('not implemented');
+    },
+  }),
+}));
+
 function createHomeScreen() {
   const navigate = jest.fn();
   const props = { navigation: { navigate } } as unknown as HomeScreenProps;

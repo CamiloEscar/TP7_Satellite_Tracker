@@ -8,7 +8,7 @@ export type HomeScreenProps = NativeStackScreenProps<
 >;
 
 type MenuEntry = {
-  key: Exclude<keyof RootStackParamList, 'Home'>;
+  key: Exclude<keyof RootStackParamList, 'Home' | 'CatalogDetail'>;
   title: string;
 };
 

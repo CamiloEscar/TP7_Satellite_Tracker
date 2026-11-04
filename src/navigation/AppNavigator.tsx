@@ -1,5 +1,6 @@
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '../types';
+import CatalogDetailScreen from '../screens/CatalogDetailScreen';
 import CatalogScreen from '../screens/CatalogScreen';
 import HomeScreen from '../screens/HomeScreen';
 import MapScreen from '../screens/MapScreen';
@@ -26,6 +27,11 @@ export default function AppNavigator() {
         name="Catalogo"
         component={CatalogScreen}
         options={{ title: 'Catálogo' }}
+      />
+      <Stack.Screen
+        name="CatalogDetail"
+        component={CatalogDetailScreen}
+        options={({ route }) => ({ title: route.params.name })}
       />
       <Stack.Screen
         name="Pases"

@@ -8,11 +8,20 @@ import {
 } from './shared';
 
 const GP_BASE_URL = 'https://celestrak.org/NORAD/elements/gp.php';
+// SupGP lives under /NORAD/elements/supplemental/ (verified live 2026-11-03;
+// the /NORAD/elements/sup-gp.php path 404s). CelesTrak serves each SupGP FILE
+// at most once per 2 h and answers repeats with a 403 text notice, so the GP
+// GROUP=starlink set is the always-available base and SupGP only enriches it.
 const SUPGP_STARLINK_URL =
-  'https://celestrak.org/NORAD/elements/sup-gp.php?FILE=starlink&FORMAT=json';
+  'https://celestrak.org/NORAD/elements/supplemental/sup-gp.php?FILE=starlink&FORMAT=JSON';
 
-/** GP groups downloaded by default (ISS/stations, GPS operacional, weather). */
-const DEFAULT_GP_GROUPS: readonly string[] = ['stations', 'gps-ops', 'weather'];
+/** GP groups downloaded by default (ISS/stations, Starlink, GPS, weather). */
+const DEFAULT_GP_GROUPS: readonly string[] = [
+  'stations',
+  'starlink',
+  'gps-ops',
+  'weather',
+];
 
 export interface CelesTrakProviderOptions {
   http: HttpClient;
@@ -27,9 +36,25 @@ interface SetRow {
 }
 
 /**
+ * SupGP can return several elements for one object (multiple epochs or
+ * sources); keep only the newest per NORAD ID.
+ */
+function newestPerNoradId(records: OrbitalRecord[]): OrbitalRecord[] {
+  const newest = new Map<number, OrbitalRecord>();
+  for (const record of records) {
+    const kept = newest.get(record.noradId);
+    if (!kept || record.epoch > kept.epoch) {
+      newest.set(record.noradId, record);
+    }
+  }
+  return [...newest.values()];
+}
+
+/**
  * CelesTrak provider: GP JSON catalog (`gp.php?GROUP=...&FORMAT=json`) plus the
- * SupGP Starlink set (`sup-gp.php?FILE=starlink&FORMAT=json`). Both return
- * arrays of CCSDS OMM JSON objects; SupGP rows carry extra Starlink metadata.
+ * SupGP Starlink set (`supplemental/sup-gp.php?FILE=starlink&FORMAT=JSON`). Both
+ * return arrays of CCSDS OMM JSON objects; SupGP rows carry extra Starlink
+ * metadata.
  *
  * One download feeds both the catalog and the per-satellite lookups: the
  * parsed set is kept in memory and reused while `getCatalog` re-downloads it.
@@ -50,29 +75,62 @@ export class CelesTrakProvider {
 
   /**
    * Downloads the configured set (always fresh: this is the refresh path for
-   * RF-09) and returns the derived catalog entries.
+   * RF-09) and returns the derived catalog entries. A single failing source
+   * is tolerated: only when every source fails does this throw.
    */
   async getCatalog(): Promise<CatalogEntry[]> {
     const fetchedAt = new Date(this.clock.now());
     const set = new Map<number, SetRow>();
-    for (const group of this.gpGroups) {
-      const raw = await requestJson(
-        this.http,
-        `${GP_BASE_URL}?GROUP=${group}&FORMAT=json`,
-        'CelesTrak GP catalog',
-      );
-      for (const record of this.parseList(raw, 'celestrak-gp', fetchedAt)) {
-        set.set(record.noradId, this.toSetRow(record, group));
+    let succeeded = 0;
+    let firstFailure: unknown;
+
+    const loadSource = async (
+      fetchRows: () => Promise<unknown>,
+      source: 'celestrak-gp' | 'celestrak-supgp',
+      queryGroup: string | undefined,
+    ): Promise<void> => {
+      try {
+        const records = this.parseList(await fetchRows(), source, fetchedAt);
+        // SupGP may carry several elements per object: keep the newest.
+        const rows =
+          source === 'celestrak-supgp' ? newestPerNoradId(records) : records;
+        for (const record of rows) {
+          set.set(record.noradId, this.toSetRow(record, queryGroup));
+        }
+        succeeded += 1;
+      } catch (e) {
+        firstFailure ??= e;
       }
+    };
+
+    for (const group of this.gpGroups) {
+      await loadSource(
+        () =>
+          requestJson(
+            this.http,
+            `${GP_BASE_URL}?GROUP=${group}&FORMAT=json`,
+            'CelesTrak GP catalog',
+          ),
+        'celestrak-gp',
+        group,
+      );
     }
-    const supRaw = await requestJson(
-      this.http,
-      SUPGP_STARLINK_URL,
-      'CelesTrak SupGP Starlink',
-    );
     // SupGP is the richer source for Starlink rows: overwrite GP duplicates.
-    for (const record of this.parseList(supRaw, 'celestrak-supgp', fetchedAt)) {
-      set.set(record.noradId, this.toSetRow(record, undefined));
+    await loadSource(
+      () =>
+        requestJson(this.http, SUPGP_STARLINK_URL, 'CelesTrak SupGP Starlink'),
+      'celestrak-supgp',
+      undefined,
+    );
+
+    if (succeeded === 0) {
+      throw firstFailure instanceof DataError
+        ? firstFailure
+        : new DataError(
+            'DATA_NETWORK',
+            'CelesTrak: every catalog source failed.',
+            { cause: firstFailure },
+          );
     }
     this.set = set;
     return [...set.values()].map(row => row.entry);

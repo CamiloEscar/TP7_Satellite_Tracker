@@ -184,8 +184,8 @@ const ISS_NORAD_ID = 25544;
 
 /**
  * Catalog classification (RF-08): SupGP Starlink download -> 'starlink';
- * NORAD 25544 or name containing "ISS" -> 'iss'; gps-ops/weather query group
- * -> that group; everything else -> 'other'.
+ * NORAD 25544 or name containing "ISS" -> 'iss'; gps-ops/weather/starlink
+ * query group -> that group; everything else -> 'other'.
  */
 export function classifyCatalogGroup(
   noradId: number,
@@ -199,7 +199,11 @@ export function classifyCatalogGroup(
   if (noradId === ISS_NORAD_ID || name.toUpperCase().includes('ISS')) {
     return 'iss';
   }
-  if (queryGroup === 'gps-ops' || queryGroup === 'weather') {
+  if (
+    queryGroup === 'gps-ops' ||
+    queryGroup === 'weather' ||
+    queryGroup === 'starlink'
+  ) {
     return queryGroup;
   }
   return 'other';
