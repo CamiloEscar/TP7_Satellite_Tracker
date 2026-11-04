@@ -1,13 +1,19 @@
-import type { ObserverGeodetic } from './orbital/types';
+import type { ObserverGeodetic } from '../orbital/types';
 
 /**
- * Minimal observer-location store: get/set/subscribe over a module-level
- * value, the same seam as `src/selection.ts`. `PassesScreen` reads it;
- * `bootstrap.ts` keeps its own copy for the N2YO provider until Hito 7.
+ * Observer layer: observer-location store plus the pure modules for GPS /
+ * manual location, compass math and heading sources. `PassesScreen`,
+ * `MapScreen` and `SettingsScreen` write/read the store here; the pure
+ * modules are re-exported as the layer's public surface.
  */
-// ponytail: module-level singleton defaulting to Buenos Aires. Hito 7 (GPS +
-// manual location) becomes the writer; replace with the real observer layer
-// if this store ever needs persistence or multi-observer support.
+// ponytail: module-level singleton defaulting to Buenos Aires. GPS + manual
+// location (SettingsScreen) are the writers; replace with a real store if
+// this ever needs persistence or multi-observer support.
+
+export * from './compass';
+export * from './config';
+export * from './heading';
+export * from './location';
 
 /** Default observer: Buenos Aires (25 m above sea level). */
 export const DEFAULT_OBSERVER: ObserverGeodetic = {

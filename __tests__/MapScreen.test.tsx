@@ -10,6 +10,10 @@ import { Text } from 'react-native';
 // __mocks__/@maplibre/maplibre-react-native provides plain
 // Map/Camera/GeoJSONSource/Layer/Marker components.
 jest.mock('@maplibre/maplibre-react-native');
+// Svg components (CompassOverlay) and the native magnetometer both have
+// manual mocks in __mocks__ (the sensors mock is controllable).
+jest.mock('react-native-svg');
+jest.mock('react-native-sensors');
 
 import MapScreen, { type MapScreenProps } from '../src/screens/MapScreen';
 import { DataProviderContext } from '../src/dataProviderContext';
@@ -19,6 +23,14 @@ import {
   DEFAULT_SATELLITE_NORAD_ID,
   setSelectedNoradId,
 } from '../src/selection';
+
+type SensorsMock = {
+  __emitMagnetometer: (x: number, y: number) => void;
+  __emitMagnetometerError: (error?: unknown) => void;
+  __resetMagnetometer: () => void;
+};
+
+const sensorsMock = jest.requireMock<SensorsMock>('react-native-sensors');
 
 // ISS TLE A - satellite.js README example, epoch 2019-06-05T12:12:57.999883Z.
 const ISS_TLE_A = {
@@ -81,6 +93,7 @@ beforeEach(() => {
   jest.useFakeTimers();
   jest.setSystemTime(new Date('2019-06-05T12:13:00.000Z'));
   setSelectedNoradId(DEFAULT_SATELLITE_NORAD_ID);
+  sensorsMock.__resetMagnetometer();
 });
 
 afterEach(() => {
@@ -123,6 +136,15 @@ function visibleText(renderer: ReactTestRenderer.ReactTestRenderer): string {
     .join('\n');
 }
 
+async function press(
+  renderer: ReactTestRenderer.ReactTestRenderer,
+  testID: string,
+) {
+  await ReactTestRenderer.act(async () => {
+    renderer.root.findByProps({ testID }).props.onPress();
+  });
+}
+
 describe('MapScreen', () => {
   it('renders the position readout with UTC time for the selected satellite', async () => {
     const renderer = await renderMap(fakeProvider());
@@ -152,5 +174,62 @@ describe('MapScreen', () => {
   it('uses the noradId route param when provided', async () => {
     const renderer = await renderMap(fakeProvider(), { noradId: 48274 });
     expect(visibleText(renderer)).toContain('STARLINK-30000');
+  });
+});
+
+describe('MapScreen - az/el readout and compass overlay', () => {
+  it('renders the live az/el readout with a cardinal label', async () => {
+    const renderer = await renderMap(fakeProvider());
+    expect(visibleText(renderer)).toMatch(
+      /Az: \d+\.\d° \((N|NE|E|SE|S|SW|W|NW)\) El: -?\d+\.\d°/,
+    );
+  });
+
+  it('toggles the compass overlay with the Brújula button', async () => {
+    const renderer = await renderMap(fakeProvider());
+    // `testID` matches both the composite and its host node, so count > 0.
+    const overlayNodes = () =>
+      renderer.root.findAllByProps({ testID: 'compass-overlay' }).length;
+    expect(overlayNodes()).toBe(0);
+
+    await press(renderer, 'compass-toggle');
+    expect(overlayNodes()).toBeGreaterThan(0);
+
+    await press(renderer, 'compass-toggle');
+    expect(overlayNodes()).toBe(0);
+  });
+
+  it('shows the declination-corrected true heading from the magnetometer', async () => {
+    const renderer = await renderMap(fakeProvider());
+    await press(renderer, 'compass-toggle');
+
+    // Device top pointing to magnetic north (x=0, y=1) -> magnetic 0°;
+    // with the default -10° declination the true heading is 350°.
+    ReactTestRenderer.act(() => {
+      sensorsMock.__emitMagnetometer(0, 1);
+    });
+
+    expect(visibleText(renderer)).toContain('Rumbo verdadero: 350.0° (N)');
+  });
+
+  it('falls back to a manual heading when the magnetometer is unavailable', async () => {
+    const renderer = await renderMap(fakeProvider());
+    await press(renderer, 'compass-toggle');
+
+    ReactTestRenderer.act(() => {
+      sensorsMock.__emitMagnetometerError();
+    });
+
+    expect(visibleText(renderer)).toContain('Magnetómetro no disponible');
+    ReactTestRenderer.act(() => {
+      renderer.root
+        .findByProps({ testID: 'compass-manual-heading' })
+        .props.onChangeText('90');
+    });
+    await press(renderer, 'compass-manual-apply');
+
+    // Manual magnetic heading 90°; default -10° declination -> true 80°.
+    expect(visibleText(renderer)).toContain('Rumbo verdadero: 80.0° (E)');
+    expect(visibleText(renderer)).toContain('Ángulo al satélite:');
   });
 });

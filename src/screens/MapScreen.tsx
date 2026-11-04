@@ -9,6 +9,7 @@ import {
   type StyleSpecification,
 } from '@maplibre/maplibre-react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
+import CompassOverlay from '../components/CompassOverlay';
 import EmptyState from '../components/EmptyState';
 import { useDataProvider } from '../dataProviderContext';
 import type { OrbitalRecord } from '../data';
@@ -20,11 +21,18 @@ import {
 } from '../geo';
 import type { GeoJsonPosition, GroundTrackSample, LatLon } from '../geo';
 import {
+  cardinalLabel,
+  getDeclinationDeg,
+  getObserver,
+  subscribeDeclinationDeg,
+} from '../observer';
+import {
   createSatrecFromOmm,
   createSatrecFromTle,
+  lookAnglesAt,
   subpointAt,
 } from '../orbital';
-import type { Satrec, SubpointResult } from '../orbital';
+import type { LookAnglesResult, Satrec, SubpointResult } from '../orbital';
 import { getSelectedNoradId, subscribeSelectedNoradId } from '../selection';
 import type { RootStackParamList } from '../types';
 
@@ -75,6 +83,12 @@ export default function MapScreen({ route }: MapScreenProps) {
   const [failed, setFailed] = useState(false);
   const [track, setTrack] = useState<GroundTrackSample[]>([]);
   const [position, setPosition] = useState<MarkerPosition | null>(null);
+  const [look, setLook] = useState<LookAnglesResult | null>(null);
+  const [compassOpen, setCompassOpen] = useState(false);
+  const declinationDeg = useSyncExternalStore(
+    subscribeDeclinationDeg,
+    getDeclinationDeg,
+  );
   const [minElevationDeg, setMinElevationDeg] = useState(
     DEFAULT_MIN_ELEVATION_DEG,
   );
@@ -122,6 +136,10 @@ export default function MapScreen({ route }: MapScreenProps) {
       try {
         const timeUTC = new Date();
         setPosition({ ...subpointAt(satrec, timeUTC), timeUTC });
+        // ponytail: subpointAt and lookAnglesAt propagate once each (2x per
+        // 2.5 s tick); collapse into a single propagateEci only if the Hito 9
+        // performance measurement cares.
+        setLook(lookAnglesAt(satrec, getObserver(), timeUTC));
       } catch {
         setFailed(true);
       }
@@ -196,6 +214,12 @@ export default function MapScreen({ route }: MapScreenProps) {
         <Text style={styles.positionText}>
           Hora (UTC): {position.timeUTC.toISOString()}
         </Text>
+        {look && (
+          <Text style={styles.positionText} testID="look-readout">
+            Az: {look.azimuthDeg.toFixed(1)}° ({cardinalLabel(look.azimuthDeg)})
+            El: {look.elevationDeg.toFixed(1)}°
+          </Text>
+        )}
         <View style={styles.chips}>
           <Text style={styles.chipsLabel}>Elevación mínima:</Text>
           {ELEVATION_PRESETS.map(degrees => (
@@ -218,7 +242,28 @@ export default function MapScreen({ route }: MapScreenProps) {
             </Pressable>
           ))}
         </View>
+        <View style={styles.chips}>
+          <Pressable
+            testID="compass-toggle"
+            onPress={() => setCompassOpen(open => !open)}
+            style={[styles.chip, compassOpen && styles.chipActive]}
+          >
+            <Text
+              style={[styles.chipLabel, compassOpen && styles.chipLabelActive]}
+            >
+              Brújula
+            </Text>
+          </Pressable>
+        </View>
       </View>
+      {compassOpen && look && (
+        <View style={styles.compassBox}>
+          <CompassOverlay
+            declinationDeg={declinationDeg}
+            satelliteAzimuthDeg={look.azimuthDeg}
+          />
+        </View>
+      )}
     </View>
   );
 }
@@ -237,6 +282,11 @@ const styles = StyleSheet.create({
     backgroundColor: '#D32F2F',
     borderWidth: 2,
     borderColor: '#FFFFFF',
+  },
+  compassBox: {
+    position: 'absolute',
+    top: 16,
+    right: 16,
   },
   readout: {
     padding: 16,

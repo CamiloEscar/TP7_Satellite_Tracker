@@ -11,7 +11,7 @@ import {
 } from './data';
 import type { AppDataProvider } from './dataProviderContext';
 import { OpSqliteStore } from './db';
-import type { ObserverGeodetic } from './orbital/types';
+import { getObserver } from './observer';
 
 /** Real `HttpClient` over the platform fetch (RN provides it globally). */
 const fetchHttpClient: HttpClient = async (url, init) => {
@@ -39,14 +39,6 @@ const secrets: SecretStore = {
   get: async () => null,
 };
 
-// ponytail: placeholder observer (Buenos Aires) until the observer layer
-// (Hito 7) provides the real GPS/manual position.
-const DEFAULT_OBSERVER: ObserverGeodetic = {
-  latitudeDeg: -34.6037,
-  longitudeDeg: -58.3816,
-  altitudeKm: 0.025, // Buenos Aires is ~25 m above sea level (was a 25 km units slip)
-};
-
 /**
  * Composition root: wires the real data layer once (op-sqlite cache, real
  * providers, real fetch). Screens consume it only through
@@ -68,7 +60,10 @@ export function createDataProvider(): AppDataProvider {
       http: fetchHttpClient,
       secrets,
       limiter,
-      observer: DEFAULT_OBSERVER,
+      // ponytail: the observer is captured at composition time (app start,
+      // the store default). Pass a getter if live updates matter for the
+      // Hito 10 validation flow.
+      observer: getObserver(),
     }),
     cache,
   });

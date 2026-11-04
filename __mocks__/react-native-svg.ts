@@ -10,6 +10,7 @@ const Hidden = (_props: PropsWithChildren) => null;
 
 export default Hidden;
 export const Circle = Hidden;
+export const Line = Hidden;
 export const Polyline = Hidden;
 export const Path = Hidden;
 export const Text = Hidden;
