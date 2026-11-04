@@ -1,4 +1,4 @@
-import { useState, useSyncExternalStore } from 'react';
+import { useEffect, useState, useSyncExternalStore } from 'react';
 import {
   PermissionsAndroid,
   Pressable,
@@ -9,6 +9,15 @@ import {
   View,
 } from 'react-native';
 import Geolocation from 'react-native-geolocation-service';
+import {
+  MAX_LEAD_MINUTES,
+  MIN_LEAD_MINUTES,
+  createNotificationService,
+  getLeadMinutes,
+  notifeePort,
+  setLeadMinutes,
+} from '../notifications';
+import type { NotificationPermissionState } from '../notifications';
 import {
   DEFAULT_DECLINATION_DEG,
   getDeclinationDeg,
@@ -81,6 +90,27 @@ export default function SettingsScreen() {
   const [declinationStatus, setDeclinationStatus] = useState<string | null>(
     null,
   );
+  const [leadText, setLeadText] = useState(String(getLeadMinutes()));
+  const [leadStatus, setLeadStatus] = useState<string | null>(null);
+  const [notificationPermission, setNotificationPermission] =
+    useState<NotificationPermissionState | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    createNotificationService(notifeePort())
+      .ensureReady()
+      .then(state => {
+        if (!cancelled) {
+          setNotificationPermission(state);
+        }
+      })
+      .catch(() => {
+        // Native module unavailable: leave the state unset instead of crashing.
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const requestGpsLocation = async () => {
     setGpsStatus('loading');
@@ -135,6 +165,21 @@ export default function SettingsScreen() {
     }
     setDeclinationDeg(value);
     setDeclinationStatus(`Declinación guardada: ${value}°`);
+  };
+
+  const saveLead = () => {
+    const value = Number(leadText.trim());
+    if (
+      leadText.trim() === '' ||
+      !Number.isInteger(value) ||
+      value < MIN_LEAD_MINUTES ||
+      value > MAX_LEAD_MINUTES
+    ) {
+      setLeadStatus('Minutos de aviso fuera de rango (1 a 120).');
+      return;
+    }
+    setLeadMinutes(value);
+    setLeadStatus(`Aviso guardado: ${value} min`);
   };
 
   return (
@@ -219,6 +264,36 @@ export default function SettingsScreen() {
       {declinationStatus && (
         <Text style={styles.status} testID="declination-status">
           {declinationStatus}
+        </Text>
+      )}
+
+      <Text style={styles.sectionTitle}>Notificaciones</Text>
+      <Text style={styles.note}>
+        Aviso previo al próximo pase del satélite seleccionado.
+      </Text>
+      <Text style={styles.fieldLabel}>Aviso antes del pase (min)</Text>
+      <TextInput
+        style={styles.input}
+        testID="lead-input"
+        value={leadText}
+        onChangeText={setLeadText}
+        keyboardType="numbers-and-punctuation"
+      />
+      <Pressable
+        style={styles.button}
+        testID="save-lead-button"
+        onPress={saveLead}
+      >
+        <Text style={styles.buttonLabel}>Guardar aviso</Text>
+      </Pressable>
+      {leadStatus && (
+        <Text style={styles.status} testID="lead-status">
+          {leadStatus}
+        </Text>
+      )}
+      {notificationPermission && !notificationPermission.granted && (
+        <Text style={styles.status} testID="notification-permission-status">
+          {notificationPermission.message}
         </Text>
       )}
       <View style={styles.footer} />

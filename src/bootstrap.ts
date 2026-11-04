@@ -1,3 +1,5 @@
+import BackgroundFetch from 'react-native-background-fetch';
+import type { HeadlessEvent } from 'react-native-background-fetch';
 import type { CacheStore, HttpClient, SecretStore } from './data';
 import {
   CacheService,
@@ -11,7 +13,15 @@ import {
 } from './data';
 import type { AppDataProvider } from './dataProviderContext';
 import { OpSqliteStore } from './db';
+import {
+  createBackgroundFetchHandler,
+  createHeadlessTask,
+  createNotificationService,
+  createPassRefresh,
+  notifeePort,
+} from './notifications';
 import { getObserver } from './observer';
+import { getSelectedNoradId, subscribeSelectedNoradId } from './selection';
 
 /** Real `HttpClient` over the platform fetch (RN provides it globally). */
 const fetchHttpClient: HttpClient = async (url, init) => {
@@ -67,4 +77,50 @@ export function createDataProvider(): AppDataProvider {
     }),
     cache,
   });
+}
+
+/**
+ * Wires notifications + background refresh (Hito 8): Android channel and
+ * runtime permission, background-fetch registration (its README: `configure`
+ * auto-starts; `stopOnTerminate: false` + `enableHeadless` keep events
+ * flowing after app termination) and pass re-scheduling on selection change.
+ * Runs outside React: only module stores and injected providers.
+ */
+export function startBackgroundRefresh(provider: AppDataProvider): void {
+  const service = createNotificationService(notifeePort());
+  const deps = { provider, getSelectedNoradId, service };
+  service.ensureReady().catch(() => {
+    // Best-effort setup: a missing native module must not break startup.
+  });
+  BackgroundFetch.configure(
+    {
+      minimumFetchInterval: 15,
+      stopOnTerminate: false,
+      startOnBoot: true,
+      enableHeadless: true,
+    },
+    createBackgroundFetchHandler(deps),
+    taskId => BackgroundFetch.finish(taskId),
+  ).catch(() => {
+    // Best-effort registration: retried on the next app start.
+  });
+  const refresh = createPassRefresh(deps);
+  subscribeSelectedNoradId(() => {
+    refresh();
+  });
+}
+
+/**
+ * Headless task for background-fetch events after app termination. Self-
+ * composes the data layer: the headless JS context shares no React state
+ * with the app. Registered from `index.js` per the background-fetch README.
+ */
+export function backgroundFetchHeadlessTask(
+  event: HeadlessEvent,
+): Promise<void> {
+  return createHeadlessTask({
+    provider: createDataProvider(),
+    getSelectedNoradId,
+    service: createNotificationService(notifeePort()),
+  })(event);
 }

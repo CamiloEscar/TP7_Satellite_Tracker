@@ -27,6 +27,7 @@ jest.mock('../src/bootstrap', () => ({
       throw new Error('not implemented');
     },
   }),
+  startBackgroundRefresh: () => {},
 }));
 
 function createHomeScreen() {

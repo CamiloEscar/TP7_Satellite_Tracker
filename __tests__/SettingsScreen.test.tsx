@@ -10,7 +10,11 @@ import Geolocation from 'react-native-geolocation-service';
 // The real module is native (RNFusedLocation TurboModule); the manual mock
 // in __mocks__/react-native-geolocation-service provides jest.fn()s.
 jest.mock('react-native-geolocation-service');
+// The real notifee module is native (TurboModule bridge); the manual mock in
+// __mocks__/@notifee/react-native provides a controllable fake.
+jest.mock('@notifee/react-native');
 
+import { AuthorizationStatus } from '@notifee/react-native';
 import SettingsScreen from '../src/screens/SettingsScreen';
 import {
   DEFAULT_DECLINATION_DEG,
@@ -20,6 +24,19 @@ import {
   setDeclinationDeg,
   setObserver,
 } from '../src/observer';
+import {
+  DEFAULT_LEAD_MINUTES,
+  PERMISSION_DENIED_MESSAGE,
+  getLeadMinutes,
+  setLeadMinutes,
+} from '../src/notifications';
+
+type NotifeeMock = {
+  __setAuthorizationStatus: (status: AuthorizationStatus) => void;
+  __resetNotifee: () => void;
+};
+
+const notifeeMock = jest.requireMock<NotifeeMock>('@notifee/react-native');
 
 type PermissionMap = Awaited<
   ReturnType<typeof PermissionsAndroid.requestMultiple>
@@ -40,6 +57,8 @@ const mountedRenderers: ReactTestRenderer.ReactTestRenderer[] = [];
 beforeEach(() => {
   setObserver(DEFAULT_OBSERVER);
   setDeclinationDeg(DEFAULT_DECLINATION_DEG);
+  setLeadMinutes(DEFAULT_LEAD_MINUTES);
+  notifeeMock.__resetNotifee();
   jest.spyOn(PermissionsAndroid, 'requestMultiple').mockResolvedValue(GRANTED);
   jest.mocked(Geolocation.getCurrentPosition).mockReset();
 });
@@ -232,5 +251,39 @@ describe('SettingsScreen', () => {
     expect(visibleText(renderer)).toContain(
       'Declinación fuera de rango (-180 a 180).',
     );
+  });
+
+  it('saves a valid notification lead time into the config store', async () => {
+    const renderer = await renderSettings();
+    setText(renderer, 'lead-input', '15');
+    await press(renderer, 'save-lead-button');
+
+    expect(getLeadMinutes()).toBe(15);
+    expect(visibleText(renderer)).toContain('Aviso guardado: 15 min');
+  });
+
+  it('rejects out-of-range or non-integer lead minutes without touching the store', async () => {
+    const renderer = await renderSettings();
+    for (const bad of ['0', '121', '7.5', '']) {
+      setText(renderer, 'lead-input', bad);
+      await press(renderer, 'save-lead-button');
+      expect(getLeadMinutes()).toBe(DEFAULT_LEAD_MINUTES);
+      expect(visibleText(renderer)).toContain(
+        'Minutos de aviso fuera de rango (1 a 120).',
+      );
+    }
+  });
+
+  it('shows the Spanish permission-denied message in the notifications section', async () => {
+    notifeeMock.__setAuthorizationStatus(AuthorizationStatus.DENIED);
+    const renderer = await renderSettings();
+
+    expect(visibleText(renderer)).toContain(PERMISSION_DENIED_MESSAGE);
+  });
+
+  it('shows no permission message when notifications are allowed', async () => {
+    const renderer = await renderSettings();
+
+    expect(visibleText(renderer)).not.toContain(PERMISSION_DENIED_MESSAGE);
   });
 });

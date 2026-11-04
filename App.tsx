@@ -1,13 +1,14 @@
 import { NavigationContainer } from '@react-navigation/native';
 import { StatusBar, useColorScheme } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
-import { createDataProvider } from './src/bootstrap';
+import { createDataProvider, startBackgroundRefresh } from './src/bootstrap';
 import { DataProviderContext } from './src/dataProviderContext';
 import AppNavigator from './src/navigation/AppNavigator';
 
 // Composition root: the real data layer is wired once here and injected into
 // screens through DataProviderContext (tests mock src/bootstrap).
 const dataProvider = createDataProvider();
+startBackgroundRefresh(dataProvider);
 
 function App() {
   const isDarkMode = useColorScheme() === 'dark';
