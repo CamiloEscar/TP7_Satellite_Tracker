@@ -6,24 +6,24 @@ Forma de trabajo (heredada del TP6): un hito por sesión; este archivo es el ún
 
 ## Requisitos
 
-| ID    | Requisito                                                  | Hito | Estado       | Evidencia                                                                                          |
-| ----- | ---------------------------------------------------------- | ---- | ------------ | -------------------------------------------------------------------------------------------------- |
-| RF-01 | Buscar/seleccionar satélites por nombre o NORAD ID         | 4    | Pendiente    |                                                                                                    |
-| RF-02 | Posición actual (lat/lon/alt) vía SGP4 local               | 2, 5 | Implementado | Hito 2: `subpointAt`, 22 tests jest offline (TLE↔OMM <1 km, regression lock). Falta mapa (Hito 5). |
-| RF-03 | Azimut/elevación respecto del observador                   | 2, 7 | Implementado | Hito 2: `lookAnglesAt` (grados en frontera; el≈90°/range≈alt testeado). Falta UI viva (Hito 7).    |
-| RF-04 | Ventanas de visibilidad (AOS, máximo, LOS)                 | 6    | Pendiente    |                                                                                                    |
-| RF-05 | Sky chart polar SVG                                        | 6    | Pendiente    |                                                                                                    |
-| RF-06 | Notificación N minutos antes del pase                      | 8    | Pendiente    |                                                                                                    |
-| RF-07 | Modo brújula (overlay de orientación)                      | 7    | Pendiente    |                                                                                                    |
-| RF-08 | Filtrar catálogo por constelación                          | 4    | Pendiente    |                                                                                                    |
-| RF-09 | Auto-refresh de datos orbitales por TTL (12-24 h)          | 3, 8 | Implementado | Hito 3: caché TTL 12-24 h + fallback stale (lógica). Falta auto-refresh background (Hito 8).       |
-| RF-10 | Mapa con posición en tiempo real (refresco 1-5 s local)    | 5    | Pendiente    |                                                                                                    |
-| RF-11 | Ground track ±1 órbita con corte de antimeridiano          | 5    | Pendiente    |                                                                                                    |
-| RF-12 | Footprint según altitud y elevación mínima configurable    | 5    | Pendiente    |                                                                                                    |
-| RF-13 | Capa de constelación (subconjunto Starlink)                | 9    | Pendiente    |                                                                                                    |
-| RF-14 | Abstracción de proveedores + caché + fallback              | 3    | Implementado | Hito 3: `DataProvider` + 4 proveedores + orquestador con fallback; 44 tests offline.               |
-| RF-15 | Modo validación vs N2YO / Where the ISS at? (error km)     | 10   | Pendiente    |                                                                                                    |
-| RF-16 | Antigüedad de datos orbitales + alerta de desactualización | 4    | Pendiente    |                                                                                                    |
+| ID    | Requisito                                                  | Hito | Estado       | Evidencia                                                                                                                   |
+| ----- | ---------------------------------------------------------- | ---- | ------------ | --------------------------------------------------------------------------------------------------------------------------- |
+| RF-01 | Buscar/seleccionar satélites por nombre o NORAD ID         | 4    | Verificado   | Hito 4: búsqueda nombre/NORAD + selección → detalle, verificado en emulador (92/92 jest).                                   |
+| RF-02 | Posición actual (lat/lon/alt) vía SGP4 local               | 2, 5 | Implementado | Hito 2: `subpointAt`, 22 tests jest offline (TLE↔OMM <1 km, regression lock). Falta mapa (Hito 5).                          |
+| RF-03 | Azimut/elevación respecto del observador                   | 2, 7 | Implementado | Hito 2: `lookAnglesAt` (grados en frontera; el≈90°/range≈alt testeado). Falta UI viva (Hito 7).                             |
+| RF-04 | Ventanas de visibilidad (AOS, máximo, LOS)                 | 6    | Pendiente    |                                                                                                                             |
+| RF-05 | Sky chart polar SVG                                        | 6    | Pendiente    |                                                                                                                             |
+| RF-06 | Notificación N minutos antes del pase                      | 8    | Pendiente    |                                                                                                                             |
+| RF-07 | Modo brújula (overlay de orientación)                      | 7    | Pendiente    |                                                                                                                             |
+| RF-08 | Filtrar catálogo por constelación                          | 4    | Verificado   | Hito 4: chips por grupo; ISS/GPS verificados en emulador; Starlink pendiente re-check (rate limit CelesTrak, ver registro). |
+| RF-09 | Auto-refresh de datos orbitales por TTL (12-24 h)          | 3, 8 | Implementado | Hito 3: caché TTL 12-24 h + fallback stale (lógica). Falta auto-refresh background (Hito 8).                                |
+| RF-10 | Mapa con posición en tiempo real (refresco 1-5 s local)    | 5    | Implementado | Hito 5: marcador + readout con refresco 2.5 s; movimiento verificado en emulador. Tiles pendientes de API key (humano).     |
+| RF-11 | Ground track ±1 órbita con corte de antimeridiano          | 5    | Implementado | Hito 5: muestreo 60 s + split antimeridiano (11 tests). Dibujo pendiente de API key.                                        |
+| RF-12 | Footprint según altitud y elevación mínima configurable    | 5    | Implementado | Hito 5: fórmula §4 + chips 0/5/10/20° (tests de valor conocido). Dibujo pendiente de API key.                               |
+| RF-13 | Capa de constelación (subconjunto Starlink)                | 9    | Pendiente    |                                                                                                                             |
+| RF-14 | Abstracción de proveedores + caché + fallback              | 3    | Implementado | Hito 3: `DataProvider` + 4 proveedores + orquestador con fallback; 44 tests offline.                                        |
+| RF-15 | Modo validación vs N2YO / Where the ISS at? (error km)     | 10   | Pendiente    |                                                                                                                             |
+| RF-16 | Antigüedad de datos orbitales + alerta de desactualización | 4    | Verificado   | Hito 4: badge de edad verificado en emulador; alerta over-TTL cubierta por tests.                                           |
 
 ---
 
@@ -77,21 +77,23 @@ Forma de trabajo (heredada del TP6): un hito por sesión; este archivo es el ún
 
 ## Hito 4 — Catálogo y búsqueda
 
-- [ ] Listado del catálogo con búsqueda por nombre y NORAD ID
-- [ ] Filtros por constelación/grupo (Starlink, ISS, GPS operacional, meteorológicos, etc.)
-- [ ] Indicador de antigüedad del set orbital + alerta cuando supera el TTL (RF-16)
-- [ ] Selección → detalle con NORAD ID, epoch, fuente y fecha de descarga
+- [x] Listado del catálogo con búsqueda por nombre y NORAD ID
+- [x] Filtros por constelación/grupo (Starlink, ISS, GPS operacional, meteorológicos, etc.)
+- [x] Indicador de antigüedad del set orbital + alerta cuando supera el TTL (RF-16)
+- [x] Selección → detalle con NORAD ID, epoch, fuente y fecha de descarga
 
 **Aceptación:** RF-01, RF-08, RF-16 Implementados (verificación en emulador).
+**Estado:** **Verificado (tests + emulador)** (2026-11-03): jest 92/92, `eslint` + `tsc --noEmit` OK, assess riesgo **medium**; en emulador con APK release x86_64: catálogo real de CelesTrak, búsqueda por nombre/NORAD, chips ISS/GPS, detalle con los 4 campos, badge de edad. La verificación encontró y corrigió 4 bugs reales de la capa de datos (URL de SupGP, tolerancia a fallo parcial, dedupe multi-epoch, rate limit 2 h de CelesTrak) — ver registro. Re-check menor pendiente: chip Starlink en vivo + alerta over-TTL (ambos cubiertos por tests).
 
 ## Hito 5 — Mapa (marcador, ground track, footprint)
 
-- [ ] Mapa con marcador del satélite seleccionado, refresco 1-5 s calculado localmente (throttling del estado)
-- [ ] Ground track pasado/futuro ±1 órbita, paso 30-60 s, corte del antimeridiano (dividir polilínea cuando la longitud salte >180°)
-- [ ] Footprint: círculo según altitud y elevación mínima configurable
-- [ ] Cálculo de posiciones en lote (sin Web Workers — no existen en RN nativo)
+- [x] Mapa con marcador del satélite seleccionado, refresco 1-5 s calculado localmente (throttling del estado)
+- [x] Ground track pasado/futuro ±1 órbita, paso 30-60 s, corte del antimeridiano (dividir polilínea cuando la longitud salte >180°)
+- [x] Footprint: círculo según altitud y elevación mínima configurable
+- [x] Cálculo de posiciones en lote (sin Web Workers — no existen en RN nativo)
 
 **Aceptación:** RF-10, RF-11, RF-12 Implementados; marcador en movimiento verificado en emulador.
+**Estado:** **Implementado** (2026-11-03): jest 106/106 (14 nuevos), `eslint` + `tsc --noEmit` OK, assess riesgo **medium**. En emulador: app viva con el mapa montado, **movimiento del marcador verificado** vía readout (Lat/Lon/Alt cambian entre dumps: -47.093/152.962 → -47.874/155.462 en 30 s, cálculo local a 2.5 s) y chips de elevación funcionando. **Pendiente (humano): API key de Google Maps** — sin ella el SDK no renderiza tiles ni overlays (y sin el `<meta-data>` la app crashea; fix aplicado con placeholder desde `local.properties`). Re-check visual junto con chip Starlink y alerta over-TTL.
 
 ## Hito 6 — Predicción de pases y sky chart
 
@@ -198,6 +200,34 @@ _(el agente agrega aquí: fecha, resumen, archivos, dependencias nuevas, comando
 - Gotchas: (1) fixtures `.json` y no `.ts` (jest trata todo `.ts` bajo `__tests__/` como suite); (2) URL de N2YO según docs oficiales (barra final antes de `&apiKey=`); (3) N2YO devuelve muestras now-forward → matching a 1 s con tolerancia ±1 s, mientras WTIA mantiene timestamp exacto; (4) Space-Track no tiene equivalente a `GROUP` de CelesTrak → el fallback de catálogo consulta payloads en órbita; (5) cookie de sesión de Space-Track delegada al cookie jar de la plataforma (upgrade path anotado con `ponytail:`).
 - Pendiente empírico: compilación/autolink de op-sqlite (regla del proyecto: no compilar tras cambios) — validar en el próximo build (Hito 4+); adapter Keychain para `SecretStore` cuando una pantalla lo necesite (Hito 10).
 - Próximo: Hito 4 (catálogo y búsqueda).
+
+### 2026-11-03 — Hito 4 (agente)
+
+**Hito 4 — Verificado (tests + emulador).** RF-01, RF-08 y RF-16 Verificados. La verificación en vivo encontró 4 bugs reales en la capa de datos, corregidos y fijados con tests (ver abajo).
+
+- Archivos: `src/data/catalogQuery.ts` (lógica pura: búsqueda por nombre/NORAD exacto/prefijo, filtro por grupo, formato de edad, umbral TTL), `src/dataProviderContext.ts` (context + `useDataProvider`), `src/bootstrap.ts` (composition root: op-sqlite → CacheService → providers reales; seam de mock para tests), `App.tsx` (wiring), `src/screens/CatalogScreen.tsx` (reescrita: loading/error/empty, búsqueda, chips de grupo, badge de edad + alerta over-TTL, FlatList → detalle), `src/screens/CatalogDetailScreen.tsx` (NORAD, epoch UTC, fuente, fecha de descarga), `src/navigation/AppNavigator.tsx` + `src/types/index.ts` (ruta `CatalogDetail`), tests: `src/data/__tests__/catalogQuery.test.ts` (11) + `__tests__/CatalogScreens.test.tsx` (8); `__tests__/App.test.tsx` ahora mockea `src/bootstrap`.
+- Comandos: `npx eslint .` OK; `npx tsc --noEmit` OK; `npx jest` **92/92** al cierre (9 suites: 69 baseline + 23 nuevos; 88/88 en la fase de implementación + 4 tests de los fixes); `gentle-ai review assess` riesgo **medium** (único motivo: `executable_change` en App.tsx); spot check propio: jest re-ejecutado 88/88 y 92/92.
+- Real vs simulado: UI y lógica reales; tests 100% offline con provider falso inyectado por contexto (sin red ni op-sqlite). Verificación en emulador completada después (ver abajo).
+- Decisiones: (1) copy de UI en español para igualar las pantallas existentes (código, identificadores y tests en inglés); (2) composition root en `src/bootstrap.ts` para que los tests mockeen un solo módulo; (3) `AppDataProvider = DataProvider + getCatalogWithMeta` para que los fakes sean objetos planos; (4) el detalle muestra ISO UTC crudo (sin código de formato).
+- Gotchas: la unión de tipos del menú de HomeScreen excluye `CatalogDetail` (ruta con params); FlatList en tests requiere cleanup al desmontar (act warnings).
+- Pendiente humano/empírico: adapter Keychain de `SecretStore` (Hito 10); el bootstrap marca con `ponytail:` el observador placeholder (Buenos Aires) del fallback N2YO.
+- **Verificación en emulador** (2026-11-03): `Medium_Phone_API_36.1`, APK release x86_64 con JS bundle embebido (sin Metro). Evidencia uiautomator: catálogo con datos reales de CelesTrak (ISS, CSS, GPS BIIF, CYGFM...); búsqueda por nombre (substring) y por NORAD ("25544" → ISS ZARYA); chips ISS y GPS operacional con clasificación correcta; selección → detalle con los 4 campos (NORAD ID: 25544, Epoch (UTC) real del OMM, Fuente: celestrak-gp, Descargado (UTC)); badge de edad ("Datos: hace 0 min" y "hace 7 min"). **op-sqlite: compilación, autolink y runtime verificados** — la caché persistió entre reinstalación y reinicio de la app (el badge reflejaba la edad real del set descargado minutos antes).
+- **Bugs reales encontrados por la verificación en vivo y corregidos en la capa de datos**: (1) la URL de SupGP de Hito 3 (`/NORAD/elements/sup-gp.php`) devolvía **404** — la correcta es `/NORAD/elements/supplemental/sup-gp.php?FILE=starlink&FORMAT=JSON` (verificada 200, 5,1 MB); (2) una sola fuente que fallaba tiraba abajo todo `getCatalog` — ahora tolera fallo parcial y solo falla si TODAS las fuentes fallan; (3) SupGP puede devolver varios elementos por objeto (varios epochs/fuentes) → dedupe conservando el epoch más nuevo; (4) **CelesTrak rate-limita cada set grande a 1 descarga cada 2 h** (`FILE=starlink` de SupGP y también `GROUP=starlink` de GP): repite la petición dentro de la ventana y responde **403 con aviso de texto** (no JSON). Solución: GP `GROUP=starlink` como base siempre disponible (clasificación por `queryGroup`) + SupGP solo como enriquecimiento cuando viene fresco; la caché TTL 12-24 h cumple el límite con holgura.
+- Real vs simulado (cierre): el rate limit de CelesTrak fue provocado por las descargas de diagnóstico del agente durante la verificación (ventana hasta ~01:34 UTC); la tolerancia al 403 quedó demostrada en vivo (la app siguió sirviendo el catálogo con las fuentes disponibles). El chip Starlink queda cubierto por tests y con **re-check en vivo pendiente** para la próxima corrida de emulador (misma nota para la alerta over-TTL de RF-16, no envejecible 12 h en vivo).
+- Próximo: Hito 5 (mapa).
+
+### 2026-11-03 — Hito 5 (agente)
+
+**Hito 5 — Implementado; verificación en emulador parcial.** RF-10, RF-11 y RF-12 Implementados. Movimiento del marcador verificado; render visual (tiles + overlays) pendiente de la API key de Google Maps **(humano)**.
+
+- Dependencia: `react-native-maps@1.29.11` (matriz Hito 0). Archivos: `src/geo/{track,index}.ts` (capa pura: `sampleGroundTrack` ±1 órbita con paso 60 s, `splitAtAntimeridian`, `footprintRadiusKm` con la fórmula §4 + clamps), `src/selection.ts` (store mínimo del satélite seleccionado, default ISS 25544), `src/screens/MapScreen.tsx` (MapView + Marker + Polyline por segmento + Circle + readout Lat/Lon/Alt/UTC + chips de elevación mínima 0/5/10/20°; refresco del marcador cada 2.5 s vía `subpointAt`, track muestreado una vez por selección), `src/screens/CatalogDetailScreen.tsx` (acción "Ver en mapa"), `src/types/index.ts` (param `noradId` en la ruta Mapa), `__mocks__/react-native-maps.ts` (mock manual load-bearing para jest), tests: `src/geo/__tests__/track.test.ts` (11) + `__tests__/MapScreen.test.tsx` (3).
+- Comandos: `npx eslint .` OK; `npx tsc --noEmit` OK; `npx jest` **106/106** (11 suites: 92 baseline + 14 nuevos); `gentle-ai review assess` riesgo **medium** (único motivo: `executable_change` en App.tsx); spot check propio: jest re-ejecutado 106/106. Build: `assembleRelease -PreactNativeArchitectures=x86_64` OK — **react-native-maps compila y monta bajo New Architecture: el riesgo [R] del Hito 0 se retira con evidencia**.
+- **Bug real encontrado en el emulador**: al montar `MapView` la app moría con `IllegalStateException: addViewAt ... Caused by: API key not found. Check that <meta-data android:name="com.google.android.geo.API_KEY" .../> is in the <application>` (FATAL de Fabric). No era incompatibilidad con New Arch sino la API key del SDK de Google Maps. Fix: `<meta-data android:name="com.google.android.geo.API_KEY" android:value="${MAPS_API_KEY}"/>` en el manifest + `manifestPlaceholders` leyendo `MAPS_API_KEY` de `local.properties` (gitignored, default vacío) — la key jamás entra al repo. Con key vacía presente el SDK no crashea (superficie del mapa montada, sin tiles).
+- Verificación en emulador: app viva, pantalla Mapa renderiza con satélite seleccionado ISS (ZARYA) (NORAD 25544); **movimiento del marcador verificado** por el readout en dos dumps separados ~30 s: Lat −47.093°→−47.874°, Lon 152.962°→155.462°, Alt 435.6→435.8 km (SGP4 local, refresco 2.5 s, UTC); chips de elevación mínima operativos (10° por default). Captura: contenedor de Google Maps montado (logo Google) pero **sin tiles ni overlays** hasta cargar la key.
+- Real vs simulado: algoritmos de `src/geo/` (track, antimeridiano, footprint) verificados con tests de valor conocido y monotonicidad; el dibujo visual sobre el mapa (tiles + Marker/Polyline/Circle) depende de la API key **(humano)** — el re-check en emulador va junto con el chip Starlink y la alerta over-TTL pendientes del Hito 4.
+- Gotchas: (1) el mock manual `__mocks__/react-native-maps.ts` es load-bearing — el paquete publica TS/ESM sin transpilar y jest no lo digiere; (2) gradle puede no regenerar el JS bundle pese a cambios de fuente: borrar `android/app/build/generated/assets/react/release/index.android.bundle` + cache de Metro antes del build; (3) el emulador se quedó sin espacio en `/data` (`INSTALL_FAILED_INSUFFICIENT_STORAGE`): `pm trim-caches` + `pm uninstall --user 0 com.google.android.webview` liberó ~260 MB.
+- Pendiente **(humano)**: API key de Google Maps (Google Cloud → Maps SDK for Android, restricción por paquete `com.satellitetracker` + SHA-1 del debug keystore) → cargarla en `android/local.properties` como `MAPS_API_KEY=...` y re-verificar tiles + marcador + track + footprint.
+- Próximo: Hito 6 (predicción de pases y sky chart) — la key del mapa no lo bloquea.
 
 ## Decisiones y estado (2026-11-02)
 
