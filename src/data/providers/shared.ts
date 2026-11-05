@@ -65,6 +65,22 @@ export function fieldNumber(
   return num;
 }
 
+/**
+ * Reads an optional numeric field: absent/null means "the source does not
+ * provide it" (no error), a present value goes through `fieldNumber`.
+ */
+export function optionalFieldNumber(
+  row: Record<string, unknown>,
+  field: string,
+  context: string,
+): number | undefined {
+  const value = row[field];
+  if (value === undefined || value === null) {
+    return undefined;
+  }
+  return fieldNumber(row, field, context);
+}
+
 // --- Epoch / record parsing ----------------------------------------------------
 
 /**

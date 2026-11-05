@@ -2,7 +2,9 @@ import type {
   CatalogEntry,
   DataProvider,
   OrbitalRecord,
+  TlePayload,
   ValidationPosition,
+  ValidationPositionSource,
 } from './types';
 import { DataError } from './types';
 import type { CacheHit, CacheService } from './cache';
@@ -11,7 +13,10 @@ import type { CacheHit, CacheService } from './cache';
 type CatalogSource = Pick<DataProvider, 'getCatalog' | 'getOrbitalData'>;
 
 /** Provider slice needed for validation positions (WTIA / N2YO). */
-type PositionSource = Pick<DataProvider, 'getValidationPosition'>;
+type PositionSource = Pick<
+  DataProvider,
+  'getValidationPosition' | 'getValidationTle'
+>;
 
 export interface DataOrchestratorOptions {
   catalogPrimary: CatalogSource;
@@ -74,6 +79,54 @@ export class DataOrchestrator implements DataProvider {
         );
       }
     }
+  }
+
+  /**
+   * Element set for validation mode A (WTIA `/tles`): the set BOTH sides
+   * propagate (same-TLE method, Hito 10). Falls back across the position
+   * chain like the rest of the orchestrator.
+   */
+  async getValidationTle(): Promise<TlePayload> {
+    const attempt = async (source: PositionSource): Promise<TlePayload> => {
+      const get = source.getValidationTle;
+      if (!get) {
+        throw new DataError(
+          'DATA_NOT_FOUND',
+          'Provider does not expose the validation TLE.',
+        );
+      }
+      return get.call(source);
+    };
+    try {
+      return await attempt(this.options.positionPrimary);
+    } catch (primaryError) {
+      try {
+        return await attempt(this.options.positionFallback);
+      } catch {
+        throw new DataError(
+          'DATA_ALL_PROVIDERS_FAILED',
+          'All providers failed to fetch the validation TLE.',
+          { cause: primaryError },
+        );
+      }
+    }
+  }
+
+  /**
+   * Source-specific validation position (Hito 10): 'wtia' (mode A, same-TLE
+   * reference) or 'n2yo' (mode B, az/el reference). Deliberately NO
+   * cross-fallback - the source identity is part of the validation evidence.
+   */
+  async getValidationPositionFrom(
+    source: ValidationPositionSource,
+    noradId: number,
+    timestamp: Date,
+  ): Promise<ValidationPosition> {
+    const provider =
+      source === 'wtia'
+        ? this.options.positionPrimary
+        : this.options.positionFallback;
+    return provider.getValidationPosition(noradId, timestamp);
   }
 
   private async callCatalogSource<T>(

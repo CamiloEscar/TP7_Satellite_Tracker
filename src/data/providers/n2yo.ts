@@ -7,7 +7,13 @@ import type {
 } from '../types';
 import { DataError, systemClock } from '../types';
 import type { RateLimiter } from '../rateLimiter';
-import { asObject, asObjectArray, fieldNumber, requestJson } from './shared';
+import {
+  asObject,
+  asObjectArray,
+  fieldNumber,
+  optionalFieldNumber,
+  requestJson,
+} from './shared';
 
 const BASE_URL = 'https://api.n2yo.com/rest/v1/satellite';
 const MAX_SAMPLES = 300;
@@ -100,6 +106,10 @@ export class N2yoProvider {
       latitudeDeg: fieldNumber(best, 'satlatitude', context),
       longitudeDeg: fieldNumber(best, 'satlongitude', context),
       altitudeKm: fieldNumber(best, 'sataltitude', context),
+      // N2YO computes az/el per sample for the requested observer; they are
+      // the mode B look-angle reference (RF-15).
+      azimuthDeg: optionalFieldNumber(best, 'azimuth', context),
+      elevationDeg: optionalFieldNumber(best, 'elevation', context),
     };
   }
 }

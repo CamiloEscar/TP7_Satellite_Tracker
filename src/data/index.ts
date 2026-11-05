@@ -45,4 +45,5 @@ export type {
   TleOrbitalRecord,
   TlePayload,
   ValidationPosition,
+  ValidationPositionSource,
 } from './types';

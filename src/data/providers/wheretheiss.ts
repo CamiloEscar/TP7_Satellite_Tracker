@@ -29,8 +29,12 @@ export class WtiaProvider {
     this.limiter = options.limiter;
   }
 
-  /** Downloads the TLE currently served by WTIA (`/tles`). */
-  async getTle(): Promise<TlePayload> {
+  /**
+   * Downloads the TLE currently served by WTIA (`/tles`). This is the
+   * element set the validation mode A propagates on BOTH sides (same-TLE
+   * method, Hito 10).
+   */
+  async getValidationTle(): Promise<TlePayload> {
     const raw = await requestJson(this.http, `${BASE_URL}/tles`, 'WTIA tles', {
       limiter: this.limiter,
       bucket: 'wtia',

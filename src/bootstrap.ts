@@ -43,8 +43,9 @@ const fetchHttpClient: HttpClient = async (url, init) => {
   };
 };
 
-// ponytail: secrets return null until the Keychain adapter (Hito 10); the
-// Space-Track/N2YO fallbacks just fail with DATA_AUTH until then.
+// ponytail: secrets return null until the Keychain adapter lands (it needs a
+// native build to be validated, so it stays (humano)); the Space-Track/N2YO
+// fallbacks just fail with DATA_AUTH until then.
 const secrets: SecretStore = {
   get: async () => null,
 };

@@ -54,7 +54,18 @@ export interface ValidationPosition {
   latitudeDeg: number;
   longitudeDeg: number;
   altitudeKm: number;
+  /** Topocentric azimuth computed by the source for its observer (N2YO only). */
+  azimuthDeg?: number;
+  /** Topocentric elevation computed by the source for its observer (N2YO only). */
+  elevationDeg?: number;
 }
+
+/**
+ * Source-specific validation position selector (Hito 10). Mode A needs the
+ * WTIA samples (same-TLE method), mode B the N2YO ones (az/el); the source
+ * identity is part of the evidence, so there is NO cross-fallback here.
+ */
+export type ValidationPositionSource = 'wtia' | 'n2yo';
 
 /**
  * Contract of the data layer (RF-14). `DataOrchestrator` implements it over
@@ -65,6 +76,21 @@ export interface DataProvider {
   getCatalog(): Promise<CatalogEntry[]>;
   getOrbitalData(noradId: number): Promise<OrbitalRecord>;
   getValidationPosition(
+    noradId: number,
+    timestamp: Date,
+  ): Promise<ValidationPosition>;
+  /**
+   * Element set the validation mode A propagates on BOTH sides (WTIA `/tles`).
+   * Optional: only the validation position chain exposes it.
+   */
+  getValidationTle?(): Promise<TlePayload>;
+  /**
+   * Source-specific validation position (Hito 10). Optional: unlike
+   * `getValidationPosition` there is NO cross-fallback - the source identity
+   * ('wtia' | 'n2yo') is part of the validation evidence.
+   */
+  getValidationPositionFrom?(
+    source: ValidationPositionSource,
     noradId: number,
     timestamp: Date,
   ): Promise<ValidationPosition>;

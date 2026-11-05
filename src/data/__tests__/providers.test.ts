@@ -312,7 +312,7 @@ describe('WtiaProvider', () => {
     const { provider } = makeProvider([
       { match: '/tles', body: wtiaTlesFixture },
     ]);
-    await expect(provider.getTle()).resolves.toEqual({
+    await expect(provider.getValidationTle()).resolves.toEqual({
       line1: wtiaTlesFixture.line1,
       line2: wtiaTlesFixture.line2,
     });
@@ -357,6 +357,9 @@ describe('N2yoProvider', () => {
     expect(pos.latitudeDeg).toBeCloseTo(-39.90318514);
     expect(pos.longitudeDeg).toBeCloseTo(158.28897924);
     expect(pos.altitudeKm).toBeCloseTo(417.85);
+    // Look angles N2YO computes for the observer (mode B reference).
+    expect(pos.azimuthDeg).toBeCloseTo(254.31);
+    expect(pos.elevationDeg).toBeCloseTo(-69.09);
     expect(calls[0].url).toContain(
       '/positions/25544/41.702/-76.014/0/3/&apiKey=TEST-KEY-123',
     );

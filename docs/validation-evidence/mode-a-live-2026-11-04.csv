@@ -1,0 +1,4 @@
+timestamp_utc,error_km,altitude_delta_km,azimuth_delta_deg,elevation_delta_deg,element_epoch_utc,element_fetched_at_utc,element_age_hours
+2026-11-04T22:48:27.000Z,0.000,-0.002,,,2026-11-03T22:01:52.916Z,2026-11-04T22:48:28.716Z,24.78
+2026-11-04T22:49:27.000Z,0.000,-0.002,,,2026-11-03T22:01:52.916Z,2026-11-04T22:48:28.716Z,24.79
+2026-11-04T22:50:27.000Z,0.000,-0.002,,,2026-11-03T22:01:52.916Z,2026-11-04T22:48:28.716Z,24.81
